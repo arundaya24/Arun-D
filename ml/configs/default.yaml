@@ -1,0 +1,31 @@
+# Semua hyperparameter di satu tempat.
+seed: 42
+
+data:
+  root: ml/data/raw
+  val_ratio: 0.1          # 10% dari train untuk validasi
+  num_workers: 2          # Windows: kalau error multiprocessing, set 0
+  image_size: 32
+  mean: [0.4914, 0.4822, 0.4465]   # statistik CIFAR-10
+  std:  [0.2470, 0.2435, 0.2616]
+
+model:
+  num_classes: 10
+  channels: [64, 128, 256]  # lebar tiap blok konvolusi
+  dropout: 0.3
+
+train:
+  epochs: 30
+  batch_size: 128          # turunkan ke 64 jika VRAM habis
+  optimizer: adam          # adam | sgd
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.9            # hanya untuk sgd
+  scheduler: cosine        # cosine | none
+  mixed_precision: true    # AMP: hemat VRAM, lebih cepat
+  grad_clip: 1.0
+  early_stopping_patience: 8
+
+output:
+  dir: ml/artifacts
+  model_version: aruna-cnn-v1
