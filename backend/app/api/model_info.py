@@ -24,7 +24,6 @@ def info():
             "epochs_run", "parameters", "train_seconds")
     return {**{k: m.get(k) for k in keys}, "classes": classes}
 
-
 @router.get("/metrics")
 def metrics():
     """Kurva loss/akurasi + metrik per kelas + confusion matrix untuk dashboard."""
