@@ -12,7 +12,7 @@ async function request(path, options) {
     try {
       detail = (await res.json()).detail || detail;
     } catch {
-      /* respons bukan JSON */
+      detail = `Permintaan gagal (${res.status}).`;
     }
     const err = new Error(detail);
     err.status = res.status;
@@ -35,8 +35,17 @@ export const api = {
 };
 
 export const LABEL_ID = {
-  airplane: "Pesawat", automobile: "Mobil", bird: "Burung", cat: "Kucing", deer: "Rusa",
-  dog: "Anjing", frog: "Katak", horse: "Kuda", ship: "Kapal", truck: "Truk",
+  airplane: "Pesawat",
+  automobile: "Mobil",
+  bird: "Burung",
+  cat: "Kucing",
+  deer: "Rusa",
+  dog: "Anjing",
+  frog: "Katak",
+  horse: "Kuda",
+  ship: "Kapal",
+  truck: "Truk",
 };
+
 export const labelOf = (l) => LABEL_ID[l] || l;
 export const pct = (v) => `${(v * 100).toFixed(1)}%`;
