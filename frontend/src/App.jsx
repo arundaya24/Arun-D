@@ -21,8 +21,8 @@ export default function App() {
         <header className="masthead">
           <div className="brand-section">
             <div className="brand-identity">
-              <span className="brand-badge">ARUNA.SYS</span>
-              <h1 className="brand-title">Aruna Vision</h1>
+              <span className="brand-badge">ARUN-D.SYS</span>
+              <h1 className="brand-title">Arun-D</h1>
             </div>
             <p className="brand-description">
               Sistem klasifikasi citra berbasis jaringan saraf tiruan konvolusional dengan telemetri latensi rendah.

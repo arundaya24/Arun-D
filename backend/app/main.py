@@ -16,7 +16,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="ARUNA AI", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Arun-D", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -28,4 +28,4 @@ train:
 
 output:
   dir: ml/artifacts
-  model_version: aruna-cnn-v1
+  model_version: arun-d-cnn-v1

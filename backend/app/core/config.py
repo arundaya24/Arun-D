@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "sqlite:///./aruna.db"
+    database_url: str = "sqlite:///./arun_d.db"
     model_dir: str = "ml/artifacts"
     cors_origins: str = "http://localhost:5173"
     max_upload_mb: int = 5

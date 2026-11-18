@@ -1,4 +1,4 @@
-"""Arsitektur CNN ARUNA (dibuat dari nol, tanpa pretrained).
+"""Arsitektur CNN Arun-D (dibuat dari nol, tanpa pretrained).
 
 Alur forward propagation untuk 1 gambar 3x32x32:
 
@@ -30,7 +30,7 @@ def conv_block(in_ch: int, out_ch: int, dropout: float) -> nn.Sequential:
     )
 
 
-class ArunaCNN(nn.Module):
+class ArunDCNN(nn.Module):
     def __init__(
         self,
         num_classes: int = 10,
@@ -66,9 +66,12 @@ class ArunaCNN(nn.Module):
         return self.classifier(x)
 
 
-def build_model(cfg: dict) -> ArunaCNN:
+ArunaCNN = ArunDCNN
+
+
+def build_model(cfg: dict) -> ArunDCNN:
     m = cfg["model"]
-    return ArunaCNN(
+    return ArunDCNN(
         num_classes=m["num_classes"],
         channels=tuple(m["channels"]),
         dropout=m["dropout"],

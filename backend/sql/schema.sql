@@ -1,6 +1,6 @@
 -- Opsional: tabel dibuat otomatis oleh FastAPI saat server pertama kali jalan.
-CREATE DATABASE IF NOT EXISTS aruna_ai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE aruna_ai;
+CREATE DATABASE IF NOT EXISTS arun_d CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE arun_d;
 
 CREATE TABLE IF NOT EXISTS predictions (
   id            INT AUTO_INCREMENT PRIMARY KEY,

@@ -3,7 +3,7 @@ Jalankan dari root: python -m pytest backend/tests
 """
 import os
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_aruna.db"
+os.environ["DATABASE_URL"] = "sqlite:///./test_arun_d.db"
 
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402

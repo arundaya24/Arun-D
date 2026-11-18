@@ -18,7 +18,7 @@
   "confidence": 0.9132,
   "top_k": [{"label": "cat", "score": 0.9132}, {"label": "dog", "score": 0.0621}, {"label": "deer", "score": 0.0114}],
   "inference_ms": 14.2,
-  "model_version": "aruna-cnn-v1"
+  "model_version": "arun-d-cnn-v1"
 }
 ```
 

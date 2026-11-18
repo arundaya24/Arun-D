@@ -1,4 +1,4 @@
-# Arsitektur ARUNA AI
+# Arsitektur Arun-D
 
 ## Dua dunia
 - **ML (offline):** dataset → preprocessing → augmentasi → CNN → loss → backprop → optimizer →

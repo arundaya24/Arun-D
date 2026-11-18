@@ -1,4 +1,4 @@
-# ARUNA AI
+# Arun-D
 
 Image classification menggunakan Convolutional Neural Network (CNN) yang dikembangkan dan dilatih menggunakan PyTorch dengan dataset CIFAR-10.
 
@@ -45,7 +45,7 @@ FastAPI
 ## Project Structure
 
 ```text
-aruna-ai/
+arun-d/
 ├── ml/
 │   ├── configs/
 │   ├── src/
@@ -83,8 +83,8 @@ Requirements:
 ### 1. Clone Repository
 
 ```powershell
-git clone https://github.com/USERNAME/aruna-ai.git
-cd aruna-ai
+git clone https://github.com/USERNAME/arun-d.git
+cd arun-d
 ```
 
 ### 2. Python Environment
@@ -118,19 +118,19 @@ copy .env.example .env
 For MySQL:
 
 ```sql
-CREATE DATABASE aruna_ai CHARACTER SET utf8mb4;
+CREATE DATABASE arun_d CHARACTER SET utf8mb4;
 ```
 
 Configure the database connection in `.env`:
 
 ```env
-DATABASE_URL=mysql+pymysql://USER:PASSWORD@localhost:3306/aruna_ai
+DATABASE_URL=mysql+pymysql://USER:PASSWORD@localhost:3306/arun_d
 ```
 
 Alternatively, use SQLite:
 
 ```env
-DATABASE_URL=sqlite:///./aruna.db
+DATABASE_URL=sqlite:///./arun_d.db
 ```
 
 ## Usage
@@ -223,7 +223,7 @@ Model training can also be performed using Google Colab with GPU runtime.
 from google.colab import drive
 drive.mount('/content/drive')
 
-%cd /content/drive/MyDrive/aruna-ai
+%cd /content/drive/MyDrive/arun-d
 
 !pip install -q -r requirements.txt
 !python -m ml.scripts.run_train
