@@ -1,0 +1,30 @@
+seed: 42
+
+data:
+  root: ml/data/raw
+  val_ratio: 0.1
+  num_workers: 0
+  image_size: 32
+  mean: [0.4914, 0.4822, 0.4465]
+  std:  [0.2470, 0.2435, 0.2616]
+
+model:
+  num_classes: 10
+  channels: [16, 32, 64]
+  dropout: 0.2
+
+train:
+  epochs: 3
+  batch_size: 128
+  optimizer: adam
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.9
+  scheduler: cosine
+  mixed_precision: false
+  grad_clip: 1.0
+  early_stopping_patience: 8
+
+output:
+  dir: ml/artifacts
+  model_version: aruna-cnn-quick
