@@ -1,11 +1,11 @@
-"""Inference: Dual-engine predictor (Arun-D CNN + Hybrid MobileNetV3)."""
+"""Inference: Dual-engine predictor (Arun-D CNN + Hybrid MobileNetV3) dengan deteksi manusia."""
 from __future__ import annotations
 
 import io
 import json
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -16,6 +16,15 @@ from torchvision import transforms as T
 from .errors import ImageDecodeError
 from .model import build_model
 from .transforms import get_eval_transform
+
+HUMAN_RELATED_LABELS = {
+    "ballplayer", "groom", "scuba diver", "suit", "academic gown",
+    "trench coat", "jersey", "swimming trunks", "wig", "sombrero",
+    "military uniform", "cloak", "jean", "sweatshirt", "bikini",
+    "lab coat", "mortarboard", "poncho", "stole", "tights", "breastplate",
+    "pajamas", "cardigan", "miniskirt", "hoopskirt", "overskirt",
+    "person", "human", "man", "woman"
+}
 
 
 class Predictor:
@@ -51,7 +60,6 @@ class Predictor:
 
         if cache_file.exists() and classes_file.exists():
             try:
-                # Periksa apakah ukuran file checkpoint valid (> 9 MB)
                 if cache_file.stat().st_size > 9_000_000:
                     import torchvision.models as tv_models
                     net = tv_models.mobilenet_v3_small(weights=None)
@@ -77,6 +85,41 @@ class Predictor:
         return self._hybrid_model is not None
 
     @staticmethod
+    def detect_human(image: Image.Image, top_preds: list[dict]) -> Tuple[bool, float, Optional[str]]:
+        """Mendeteksi apakah subjek dalam citra adalah manusia berdasarkan
+
+        kombinasi segmentasi warna kulit (YCrCb) dan klasifikasi kelas pakaian/atribut manusia.
+        """
+        human_matches = [
+            item for item in top_preds
+            if item["label"].lower().strip() in HUMAN_RELATED_LABELS
+        ]
+
+        skin_ratio = 0.0
+        try:
+            arr = np.array(image.convert("RGB"))
+            ycrcb = cv2.cvtColor(arr, cv2.COLOR_RGB2YCrCb)
+            # Rentang warna kulit standar YCrCb: Cr [133..173], Cb [77..127]
+            skin_mask = (
+                (ycrcb[:, :, 1] >= 133) & (ycrcb[:, :, 1] <= 173) &
+                (ycrcb[:, :, 2] >= 77) & (ycrcb[:, :, 2] <= 127)
+            )
+            skin_ratio = float(np.sum(skin_mask)) / float(skin_mask.size)
+        except Exception:
+            skin_ratio = 0.0
+
+        if human_matches:
+            match_score = human_matches[0]["score"]
+            human_conf = min(0.98, max(match_score, 0.55 + skin_ratio * 0.7))
+            return True, round(human_conf, 4), human_matches[0]["label"]
+
+        if skin_ratio >= 0.14:
+            human_conf = min(0.92, 0.45 + skin_ratio * 0.85)
+            return True, round(human_conf, 4), None
+
+        return False, 0.0, None
+
+    @staticmethod
     def decode(data: bytes) -> Image.Image:
         """Bytes -> PIL RGB."""
         try:
@@ -84,7 +127,6 @@ class Predictor:
             bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if bgr is not None:
                 return Image.fromarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-            # Fallback ke PIL
             return Image.open(io.BytesIO(data)).convert("RGB")
         except Exception as e:
             raise ImageDecodeError("File bukan gambar yang valid.") from e
@@ -111,6 +153,7 @@ class Predictor:
             "engine_used": "arun_d_cnn",
             "is_uncertain": is_uncertain,
             "is_low_confidence": is_uncertain,
+            "is_human": False,
         }
 
     @torch.no_grad()
@@ -141,6 +184,7 @@ class Predictor:
             "engine_used": "hybrid_mobilenet",
             "is_uncertain": is_uncertain,
             "is_low_confidence": is_uncertain,
+            "is_human": False,
         }
 
     def predict_bytes(self, data: bytes, top_k: int = 3) -> dict:
@@ -148,8 +192,27 @@ class Predictor:
         if self.has_hybrid:
             h_res = self.predict_hybrid(img, top_k)
             if h_res["confidence"] >= 0.60:
-                return h_res
-            a_res = self.predict(img, top_k)
-            # Pilih yang paling yakin
-            return a_res if a_res["confidence"] >= h_res["confidence"] else h_res
-        return self.predict(img, top_k)
+                base_result = h_res
+            else:
+                a_res = self.predict(img, top_k)
+                base_result = a_res if a_res["confidence"] >= h_res["confidence"] else h_res
+        else:
+            base_result = self.predict(img, top_k)
+
+        # Evaluasi deteksi manusia
+        is_human, human_conf, subtype = self.detect_human(img, base_result.get("top_k", []))
+        base_result["is_human"] = is_human
+
+        if is_human:
+            # Jika terdeteksi manusia dengan sinyal kuat atau model kurang yakin pada objek lain
+            if subtype or human_conf >= 0.65 or base_result["confidence"] < 0.60:
+                old_label = base_result["predicted"]
+                base_result["predicted"] = "human"
+                base_result["confidence"] = max(base_result["confidence"], human_conf)
+                # Perbarui daftar top_k
+                existing = [item for item in base_result.get("top_k", []) if item["label"] != "human"]
+                base_result["top_k"] = [{"label": "human", "score": human_conf}] + existing[:2]
+                base_result["is_uncertain"] = base_result["confidence"] < 0.60
+                base_result["is_low_confidence"] = base_result["is_uncertain"]
+
+        return base_result

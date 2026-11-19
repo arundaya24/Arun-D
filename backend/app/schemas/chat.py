@@ -32,6 +32,7 @@ class ChatBotResponse(BaseModel):
     top_k: Optional[List[TopKItem]] = None
     engine_used: Optional[str] = None
     is_low_confidence: Optional[bool] = None
+    is_human: Optional[bool] = False
     inference_ms: Optional[float] = None
     model_version: Optional[str] = None
 

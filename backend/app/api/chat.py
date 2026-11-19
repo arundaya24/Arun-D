@@ -29,7 +29,6 @@ from ml.src.errors import ImageDecodeError
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
 UPLOAD_DIR = Path("ml/data/uploads")
 CORRECTIONS_DIR = Path("ml/data/corrections")
 
@@ -49,21 +48,28 @@ async def chat(
     db: Session = Depends(get_db),
     predictor=Depends(get_predictor),
 ):
-    # Kasus 1: User mengirimkan gambar
-    if file is not None and file.content_type in ALLOWED_TYPES:
+    # Kasus 1: User mengirimkan berkas gambar
+    has_image = False
+    if file is not None and file.filename:
+        ctype = file.content_type or ""
+        fname = file.filename.lower()
+        if ctype.startswith("image/") or any(fname.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif", ".tiff")):
+            has_image = True
+
+    if has_image and file is not None:
         max_bytes = get_settings().max_upload_mb * 1024 * 1024
         data = await file.read()
         if len(data) > max_bytes:
             raise HTTPException(413, f"Ukuran file melebihi {get_settings().max_upload_mb} MB.")
         if not data:
-            raise HTTPException(400, "File gambar kosong.")
+            raise HTTPException(400, "Berkas gambar kosong.")
 
         try:
             result = predictor.predict_bytes(data, top_k=3)
         except ImageDecodeError as e:
             raise HTTPException(400, str(e)) from e
 
-        # Simpan file sementara agar bisa disimpan jika user memberikan koreksi
+        # Simpan file sementara agar bisa dipakai jika ada koreksi
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         ext = Path(file.filename or "img.jpg").suffix or ".jpg"
         saved_filename = f"{uuid.uuid4().hex[:12]}{ext}"
@@ -87,17 +93,22 @@ async def chat(
         predicted = result["predicted"]
         conf_pct = round(result["confidence"] * 100, 1)
         is_low_conf = result.get("is_uncertain", result["confidence"] < 0.60)
+        is_human = result.get("is_human", False) or predicted == "human"
 
-        # Logika tangani ketidakpastian secara jujur
-        if is_low_conf:
+        if is_human:
             bot_text = (
-                f"Saya kurang yakin, namun tebakan terdekat saya adalah **{predicted}** ({conf_pct}%). "
-                f"Bisa tolong konfirmasi apakah ini benar gambar {predicted}, atau beri tahu saya objek sebenarnya jika salah?"
+                f"Subjek citra terdeteksi sebagai manusia (keyakinan: {conf_pct}%). "
+                "Konfirmasikan apakah deteksi ini sesuai atau masukkan label spesifik."
+            )
+        elif is_low_conf:
+            bot_text = (
+                f"Tingkat keyakinan model berada di bawah batas konfirmasi (prediksi: {predicted}, {conf_pct}%). "
+                f"Konfirmasikan apakah objek ini adalah {predicted} atau berikan koreksi label."
             )
         else:
             bot_text = (
-                f"Saya cukup yakin ini adalah **{predicted}** (keyakinan: {conf_pct}%). "
-                f"Apakah hasil ini sudah sesuai? Anda dapat menekan 'Benar' atau memberikan label koreksi jika salah."
+                f"Objek teridentifikasi sebagai {predicted} dengan tingkat keyakinan {conf_pct}%. "
+                "Silakan konfirmasi kebenaran hasil atau masukkan label baru jika salah."
             )
 
         top_k_items = [TopKItem(label=item["label"], score=item["score"]) for item in result.get("top_k", [])]
@@ -110,6 +121,7 @@ async def chat(
             top_k=top_k_items,
             engine_used=result.get("engine_used", "arun_d_cnn"),
             is_low_confidence=is_low_conf,
+            is_human=is_human,
             inference_ms=result["inference_ms"],
             model_version=result["model_version"],
         )
@@ -118,23 +130,24 @@ async def chat(
     msg_lower = message.strip().lower()
 
     if any(q in msg_lower for q in ("ini gambar apa", "apa ini", "ini apa", "gambar apa", "tebak gambar")):
-        reply = "Silakan unggah gambar terlebih dahulu dengan tombol ikon kamera/file di samping, lalu saya akan langsung menganalisisnya! 📷"
+        reply = "Unggah berkas citra terlebih dahulu melalui tombol input di samping kolom teks untuk menjalankan inferensi."
     elif any(g in msg_lower for g in ("halo", "hai", "hei", "pagi", "siang", "sore", "malam")):
-        reply = "Halo! Saya adalah AI asisten pengenal gambar Arun-D. Unggah foto objek apa saja, dan saya akan menebaknya beserta skor keyakinan."
+        reply = "Sistem klasifikasi citra siap menerima input. Unggah berkas citra untuk melihat telemetri inferensi."
     elif any(t in msg_lower for t in ("terima kasih", "makasih", "thanks")):
-        reply = "Sama-sama! Senang bisa membantu. Jika ada gambar lain yang ingin diidentifikasi, silakan kirimkan kapan saja."
+        reply = "Layanan aktif. Silakan unggah berkas berikutnya kapan saja."
     elif not msg_lower:
-        reply = "Ada yang bisa saya bantu? Unggah gambar atau tanyakan sesuatu."
+        reply = "Sistem menunggu input. Lampirkan berkas citra atau masukkan instruksi."
     else:
         reply = (
-            f"Saya mengerti: \"{message}\". "
-            "Untuk mengenali objek, silakan lampirkan gambar dengan menekan ikon kamera di samping kolom chat."
+            f"Input diterima: \"{message}\". "
+            "Untuk menjalankan klasifikasi, lampirkan berkas citra pada formulir."
         )
 
     return ChatBotResponse(
         chatbot_message=reply,
         engine_used="chat_engine",
         is_low_confidence=False,
+        is_human=False,
     )
 
 
@@ -148,16 +161,13 @@ def submit_feedback(
     correction_saved = False
     saved_target_path = None
 
-    # Jika salah, simpan gambar ke dataset koreksi ml/data/corrections/<label>/
     if not payload.is_correct and clean_label:
         dest_dir = CORRECTIONS_DIR / clean_label
         dest_dir.mkdir(parents=True, exist_ok=True)
 
-        # Cari file dari prediction_id jika ada
         if payload.prediction_id:
             pred = db.get(Prediction, payload.prediction_id)
             if pred and UPLOAD_DIR.exists():
-                # Cari berkas terbaru di UPLOAD_DIR
                 upload_files = sorted(UPLOAD_DIR.glob("*"), key=os.path.getmtime, reverse=True)
                 if upload_files:
                     src_file = upload_files[0]
@@ -181,9 +191,9 @@ def submit_feedback(
     db.refresh(fb_row)
 
     msg = (
-        "Terima kasih atas konfirmasinya! 👍"
+        "Konfirmasi kebenaran label berhasil dicatat ke basis data."
         if payload.is_correct
-        else f"Terima kasih atas koreksinya! Label '{clean_label}' telah disimpan untuk melatih ulang AI agar lebih pintar."
+        else f"Koreksi label '{clean_label}' tersimpan ke dataset retraining aktif."
     )
 
     return FeedbackResponse(
@@ -219,7 +229,7 @@ def _run_retraining_task():
     global _retrain_status
     with _retrain_lock:
         _retrain_status["status"] = "running"
-        _retrain_status["message"] = "Sedang melatih ulang model dengan data koreksi..."
+        _retrain_status["message"] = "Fine-tuning model dengan data koreksi sedang diproses."
 
     try:
         from ml.src.finetune import fine_tune_from_corrections
@@ -230,7 +240,7 @@ def _run_retraining_task():
         )
         with _retrain_lock:
             _retrain_status["status"] = "success"
-            _retrain_status["message"] = f"Retraining selesai! Dilatih pada {res['trained_on']} data. Versi baru: {res.get('model_version')}"
+            _retrain_status["message"] = f"Retraining selesai. Total sampel: {res['trained_on']}. Versi: {res.get('model_version')}"
             _retrain_status["trained_on"] = res["trained_on"]
             _retrain_status["new_classes"] = res["new_classes"]
     except Exception as e:
@@ -245,14 +255,14 @@ def trigger_retraining():
     global _retrain_status
     with _retrain_lock:
         if _retrain_status["status"] == "running":
-            raise HTTPException(409, "Proses retraining sedang berjalan di background.")
+            raise HTTPException(409, "Proses retraining sedang berjalan.")
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     executor.submit(_run_retraining_task)
 
     return RetrainStatus(
         status="started",
-        message="Proses retraining telah dimulai di latar belakang.",
+        message="Proses retraining telah diinisialisasi pada thread terpisah.",
     )
 
 

@@ -12,18 +12,21 @@ from backend.app.services.inference import get_predictor
 
 
 class FakeChatPredictor:
-    def __init__(self, confidence=0.85):
+    def __init__(self, confidence=0.85, is_human=False, label="cat"):
         self.confidence = confidence
+        self.is_human = is_human
+        self.label = label
 
     def predict_bytes(self, data, top_k=3):
         return {
-            "predicted": "cat",
+            "predicted": self.label,
             "confidence": self.confidence,
-            "top_k": [{"label": "cat", "score": self.confidence}, {"label": "dog", "score": 1 - self.confidence}],
+            "top_k": [{"label": self.label, "score": self.confidence}, {"label": "dog", "score": round(1 - self.confidence, 4)}],
             "inference_ms": 12.5,
             "model_version": "test-v1",
             "engine_used": "fake_engine",
             "is_uncertain": self.confidence < 0.60,
+            "is_human": self.is_human,
         }
 
 
@@ -48,7 +51,7 @@ def test_chat_text_only_prompt(client):
     r = client.post("/api/chat", data={"message": "ini gambar apa?"})
     assert r.status_code == 200
     body = r.json()
-    assert "Silakan unggah gambar" in body["chatbot_message"]
+    assert "Unggah berkas citra" in body["chatbot_message"]
 
 
 def test_chat_with_image_high_confidence(client):
@@ -62,7 +65,7 @@ def test_chat_with_image_high_confidence(client):
     assert body["predicted"] == "cat"
     assert body["confidence"] == 0.85
     assert not body["is_low_confidence"]
-    assert "cukup yakin" in body["chatbot_message"]
+    assert "Objek teridentifikasi" in body["chatbot_message"]
 
 
 def test_chat_with_image_low_confidence(client):
@@ -75,7 +78,19 @@ def test_chat_with_image_low_confidence(client):
     assert r.status_code == 200
     body = r.json()
     assert body["is_low_confidence"] is True
-    assert "kurang yakin" in body["chatbot_message"]
+    assert "Tingkat keyakinan model" in body["chatbot_message"]
+
+
+def test_chat_human_detection(client):
+    app.dependency_overrides[get_predictor] = lambda: FakeChatPredictor(confidence=0.91, is_human=True, label="human")
+    r = client.post(
+        "/api/chat",
+        files={"file": ("person.png", _dummy_image(), "image/png")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["is_human"] is True
+    assert "manusia" in body["chatbot_message"].lower()
 
 
 def test_feedback_and_stats(client):
@@ -97,7 +112,7 @@ def test_feedback_and_stats(client):
         },
     )
     assert fb_res.status_code == 200
-    assert "koreksinya" in fb_res.json()["message"]
+    assert "Koreksi label" in fb_res.json()["message"]
 
     # 3. Cek statistik feedback
     stats_res = client.get("/api/feedback/stats")

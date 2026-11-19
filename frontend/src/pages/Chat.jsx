@@ -1,407 +1,219 @@
 import { useEffect, useRef, useState } from "react";
 import { api, labelOf, pct } from "../api.js";
 
-/* ─────────────────────────── helpers ─────────────────────────── */
+/* ─────────────────────────── SVGs (Zero Emojis) ─────────────────────────── */
+
+function IconCamera() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function IconSend() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function IconAlert() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
 
 let _id = 0;
 const uid = () => `msg-${++_id}-${Date.now()}`;
 
 function confidenceColor(conf) {
-  if (conf >= 0.8) return "#22c55e";   // green
-  if (conf >= 0.6) return "#eab308";   // yellow
-  return "#ef4444";                     // red
+  if (conf >= 0.8) return "#4ade80";
+  if (conf >= 0.6) return "#e59344";
+  return "#f87171";
 }
 
-/* ─────────────────────────── sub-components ──────────────────── */
+/* ─────────────────────────── Prediction Card ─────────────────────────── */
 
-function TypingIndicator() {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem" }}>
-      {/* avatar */}
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: "var(--accent)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 14,
-          flexShrink: 0,
-        }}
-      >
-        🤖
-      </div>
-      <div
-        style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--border)",
-          borderRadius: "0 12px 12px 12px",
-          padding: "0.6rem 1rem",
-          display: "flex",
-          gap: 4,
-          alignItems: "center",
-        }}
-      >
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-block",
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--text-primary)",
-              opacity: 0.6,
-              animation: `typingBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+function PredictionCard({ prediction, onFeedback, feedbackState }) {
+  const {
+    predicted,
+    confidence,
+    top_k = [],
+    is_low_confidence,
+    is_human,
+    engine_used,
+    prediction_id,
+    inference_ms,
+  } = prediction;
 
-function UserBubble({ message }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-end",
-        gap: "0.3rem",
-      }}
-    >
-      {message.imageUrl && (
-        <img
-          src={message.imageUrl}
-          alt="uploaded"
-          style={{
-            maxWidth: 180,
-            maxHeight: 180,
-            borderRadius: 8,
-            objectFit: "cover",
-            border: "1px solid var(--border)",
-          }}
-        />
-      )}
-      {message.text && (
-        <div
-          style={{
-            background: "var(--accent)",
-            color: "#fff",
-            borderRadius: "12px 12px 0 12px",
-            padding: "0.55rem 0.9rem",
-            maxWidth: "75%",
-            wordBreak: "break-word",
-            lineHeight: 1.5,
-            fontSize: "0.9rem",
-          }}
-        >
-          {message.text}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PredictionCard({ prediction, messageId, feedbackState, onFeedback }) {
-  const { predicted, confidence, top3 = [], is_low_confidence, engine_used, prediction_id } = prediction;
-  const original_label = predicted;
   const fs = feedbackState || { showing: false, labelInput: "", submitted: false };
   const color = confidenceColor(confidence);
-  const pctVal = pct(confidence);         // e.g. "87.3%"
   const widthPct = Math.min(100, Math.round(confidence * 100));
 
-  const engineLabel =
-    engine_used === "mobilenet" ? "MobileNetV3"
-    : engine_used === "arun_cnn" ? "ArunD CNN"
-    : engine_used ?? "Unknown Engine";
-
   return (
-    <div
-      className="verdict-bento"
-      style={{
-        marginTop: "0.6rem",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        padding: "0.85rem 1rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.65rem",
-        fontSize: "0.85rem",
-      }}
-    >
-      {/* header */}
-      <div className="verdict-header-block" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="card-telemetry-panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <div className="verdict-kicker" style={{ fontSize: "0.7rem", opacity: 0.6, letterSpacing: 1, textTransform: "uppercase" }}>
-            Hasil Prediksi
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", color: "var(--text-tertiary)", textTransform: "uppercase" }}>
+            Hasil Klasifikasi
           </div>
-          <div
-            className="verdict-title"
-            style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)" }}
-          >
+          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--text-primary)", marginTop: 2 }}>
             {labelOf(predicted)}
           </div>
         </div>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid var(--border)",
-            borderRadius: 20,
-            padding: "2px 10px",
-            color: "var(--text-primary)",
-            opacity: 0.8,
-            flexShrink: 0,
-          }}
-        >
-          {engineLabel}
-        </span>
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {is_human && <span className="pill-human-tag">Subjek: Manusia</span>}
+          <span className="pill-engine-tag">{engine_used || "Dual-Engine"}</span>
+        </div>
       </div>
 
-      {/* confidence bar */}
       <div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 4,
-            fontSize: "0.78rem",
-            opacity: 0.75,
-          }}
-        >
-          <span>Confidence</span>
-          <span style={{ color, fontWeight: 600 }}>{pctVal}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontFamily: "var(--font-mono)", fontSize: 11 }}>
+          <span style={{ color: "var(--text-tertiary)" }}>Confidence Score</span>
+          <span style={{ color, fontWeight: 600 }}>{pct(confidence)}</span>
         </div>
-        <div
-          style={{
-            height: 7,
-            borderRadius: 99,
-            background: "rgba(255,255,255,0.1)",
-            overflow: "hidden",
-          }}
-        >
+        <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
           <div
             style={{
               width: `${widthPct}%`,
               height: "100%",
               background: color,
-              borderRadius: 99,
-              transition: "width 0.6s ease",
+              transition: "width 0.4s var(--ease-smooth)",
             }}
           />
         </div>
       </div>
 
-      {/* low confidence warning */}
       {is_low_confidence && (
         <div
-          className="error-banner"
           style={{
-            background: "rgba(234,179,8,0.12)",
-            border: "1px solid rgba(234,179,8,0.4)",
-            borderRadius: 6,
-            padding: "0.4rem 0.7rem",
-            color: "#fde047",
-            fontSize: "0.8rem",
             display: "flex",
             alignItems: "center",
-            gap: "0.4rem",
+            gap: 8,
+            padding: "8px 10px",
+            borderRadius: 4,
+            border: "1px solid rgba(229, 147, 68, 0.35)",
+            background: "var(--accent-tint)",
+            color: "var(--accent-amber)",
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
           }}
         >
-          ⚠️ AI kurang yakin dengan prediksi ini
+          <IconAlert />
+          <span>Status: Tingkat keyakinan rendah (&lt; 60%). Butuh verifikasi pengguna.</span>
         </div>
       )}
 
-      {/* top-3 alternatives */}
-      {top3.length > 0 && (
-        <div>
-          <div style={{ fontSize: "0.75rem", opacity: 0.55, marginBottom: "0.35rem", textTransform: "uppercase", letterSpacing: 0.8 }}>
-            Top 3 Alternatif
+      {top_k.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Distribusi Top Kategori
           </div>
-          <div className="distribution-list" style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-            {top3.map((item, idx) => {
-              const itemColor = confidenceColor(item.confidence);
-              const itemWidth = Math.min(100, Math.round(item.confidence * 100));
-              return (
-                <div
-                  key={idx}
-                  className="distribution-row"
-                  style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                >
-                  <span
-                    className="distribution-name"
-                    style={{ width: 110, fontSize: "0.78rem", opacity: 0.85, flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                    title={labelOf(item.label)}
-                  >
-                    {labelOf(item.label)}
-                  </span>
-                  <div
-                    className="distribution-track"
-                    style={{ flex: 1, height: 5, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}
-                  >
-                    <div
-                      className="distribution-fill"
-                      style={{ width: `${itemWidth}%`, height: "100%", background: itemColor, borderRadius: 99 }}
-                    />
-                  </div>
-                  <span
-                    className="distribution-val"
-                    style={{ width: 44, textAlign: "right", fontSize: "0.75rem", color: itemColor, flexShrink: 0 }}
-                  >
-                    {pct(item.confidence)}
-                  </span>
-                </div>
-              );
-            })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {top_k.slice(0, 3).map((item, idx) => (
+              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                <span style={{ color: "var(--text-secondary)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {labelOf(item.label)}
+                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>
+                  {pct(item.score)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* feedback section */}
-      {!fs.submitted ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          <div style={{ fontSize: "0.75rem", opacity: 0.55 }}>Apakah prediksi ini benar?</div>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-hairline)", paddingTop: 10, marginTop: 4 }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>
+          Latensi: {inference_ms || 0} ms
+        </span>
+
+        {!fs.submitted ? (
+          <div style={{ display: "flex", gap: 6 }}>
             <button
-              className="btn-secondary"
-              onClick={() => onFeedback(messageId, true)}
-              style={{
-                fontSize: "0.8rem",
-                padding: "0.3rem 0.8rem",
-                border: "1px solid #22c55e",
-                color: "#22c55e",
-                background: "rgba(34,197,94,0.08)",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
+              type="button"
+              className="btn-tactile btn-tactile-confirm"
+              onClick={() => onFeedback(prediction_id, predicted, predicted, true)}
             >
-              ✓ Benar
+              <IconCheck /> Benar
             </button>
             <button
-              className="btn-secondary"
-              onClick={() =>
-                onFeedback(messageId, false, null, true /* showInput */)
-              }
-              style={{
-                fontSize: "0.8rem",
-                padding: "0.3rem 0.8rem",
-                border: "1px solid #ef4444",
-                color: "#ef4444",
-                background: "rgba(239,68,68,0.08)",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
+              type="button"
+              className="btn-tactile btn-tactile-correct"
+              onClick={() => onFeedback(prediction_id, predicted, null, false, true)}
             >
-              ✗ Salah
+              Koreksi
             </button>
           </div>
+        ) : (
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#4ade80" }}>
+            Feedback Tercatat
+          </span>
+        )}
+      </div>
 
-          {/* label correction input */}
-          {fs.showing && (
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-              <input
-                type="text"
-                placeholder="Label yang benar..."
-                value={fs.labelInput}
-                onChange={(e) =>
-                  onFeedback(messageId, false, e.target.value, true /* showInput */, true /* inputOnly */)
-                }
-                style={{
-                  flex: 1,
-                  minWidth: 120,
-                  padding: "0.35rem 0.6rem",
-                  background: "var(--card-bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                  color: "var(--text-primary)",
-                  fontFamily: "inherit",
-                  fontSize: "0.82rem",
-                }}
-              />
-              <button
-                className="btn-shimmer-cta"
-                disabled={!fs.labelInput.trim()}
-                onClick={() => onFeedback(messageId, false, fs.labelInput)}
-                style={{ fontSize: "0.8rem", padding: "0.35rem 0.9rem" }}
-              >
-                Kirim Koreksi
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div
-          style={{
-            fontSize: "0.78rem",
-            color: "#22c55e",
-            opacity: 0.9,
-            display: "flex",
-            alignItems: "center",
-            gap: "0.3rem",
-          }}
-        >
-          ✓ Terima kasih atas feedback Anda!
+      {fs.showing && !fs.submitted && (
+        <div style={{ display: "flex", gap: 6, marginTop: 6, paddingTop: 8, borderTop: "1px solid var(--border-hairline)" }}>
+          <input
+            type="text"
+            placeholder="Label yang benar..."
+            value={fs.labelInput}
+            onChange={(e) => onFeedback(prediction_id, predicted, e.target.value, false, true, true)}
+            style={{
+              flex: 1,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-hairline)",
+              borderRadius: 4,
+              padding: "6px 10px",
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              outline: "none",
+            }}
+          />
+          <button
+            type="button"
+            className="btn-shimmer-cta"
+            disabled={!fs.labelInput.trim()}
+            onClick={() => onFeedback(prediction_id, predicted, fs.labelInput.trim(), false)}
+            style={{ padding: "6px 12px", fontSize: 11 }}
+          >
+            Simpan
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-function AssistantBubble({ message, onFeedback, feedbackState }) {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", maxWidth: "85%" }}>
-      {/* avatar */}
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: "var(--accent)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 14,
-          flexShrink: 0,
-          marginTop: 2,
-        }}
-      >
-        🤖
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem", flex: 1 }}>
-        <div
-          style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: "0 12px 12px 12px",
-            padding: "0.6rem 0.9rem",
-            wordBreak: "break-word",
-            lineHeight: 1.6,
-            fontSize: "0.9rem",
-            color: "var(--text-primary)",
-          }}
-        >
-          {message.text}
-
-          {message.prediction && (
-            <PredictionCard
-              prediction={message.prediction}
-              messageId={message.id}
-              feedbackState={feedbackState}
-              onFeedback={onFeedback}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────── main component ──────────────────── */
+/* ─────────────────────────── Main Chat View ─────────────────────────── */
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -410,325 +222,356 @@ export default function Chat() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackStates, setFeedbackStates] = useState({});
+  const [statsData, setStatsData] = useState(null);
+  const [retrainStatus, setRetrainStatus] = useState({ status: "idle", message: "" });
 
   const fileInputRef = useRef(null);
   const bottomRef = useRef(null);
-  const messagesEndRef = useRef(null);
 
-  /* ── welcome message on mount ── */
+  // Inisialisasi percakapan awal
   useEffect(() => {
-    const welcome = {
-      id: uid(),
-      role: "assistant",
-      text: "Halo! Saya Arun-D AI Assistant 👋\n\nSaya dapat membantu Anda mengklasifikasikan gambar penyakit daun tanaman. Unggah gambar atau tanyakan sesuatu untuk memulai.",
-      prediction: null,
-    };
-    setMessages([welcome]);
+    setMessages([
+      {
+        id: uid(),
+        role: "assistant",
+        text: "Sistem inferensi citra aktif. Lampirkan berkas citra untuk menjalankan klasifikasi objek dan deteksi manusia, atau ajukan pertanyaan.",
+        prediction: null,
+      },
+    ]);
+    loadFeedbackStats();
   }, []);
 
-  /* ── auto-scroll to bottom ── */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  /* ── file selection ── */
-  function handleFileSelect(file) {
+  async function loadFeedbackStats() {
+    try {
+      const s = await api.chatStats ? await api.chatStats() : null;
+      if (s) setStatsData(s);
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleFileSelection(file) {
     if (!file) return;
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
   }
 
-  /* ── send message ── */
+  function clearSelectedFile() {
+    setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   async function sendMessage() {
     if (isLoading) return;
     if (!inputText.trim() && !selectedFile) return;
 
-    const userMsg = {
-      id: uid(),
-      role: "user",
-      text: inputText.trim(),
-      imageUrl: previewUrl,
-    };
+    const userText = inputText.trim();
+    const currentFile = selectedFile;
+    const currentPreview = previewUrl;
 
-    // append user bubble
-    setMessages((prev) => [...prev, userMsg]);
-    const sentText = inputText;
-    const sentFile = selectedFile;
+    // Reset input state
     setInputText("");
     setSelectedFile(null);
     setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Tambahkan bubble user
+    const userMsg = {
+      id: uid(),
+      role: "user",
+      text: userText || (currentFile ? `Menganalisis berkas: ${currentFile.name}` : ""),
+      imageUrl: currentPreview,
+    };
+    setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
-    // insert typing indicator placeholder id (we replace it on response)
-    const assistantId = uid();
+    const assistantMsgId = uid();
 
     try {
-      const data = await api.chat(sentText, sentFile);
+      // Panggil backend API /api/chat
+      const data = await api.chat(userText, currentFile);
 
-      let responseText = "";
       let prediction = null;
-
-      if (data.response) {
-        responseText = data.response;
+      if (data && data.predicted) {
+        prediction = {
+          prediction_id: data.prediction_id,
+          predicted: data.predicted,
+          confidence: data.confidence,
+          top_k: data.top_k || [],
+          engine_used: data.engine_used,
+          is_low_confidence: data.is_low_confidence,
+          is_human: data.is_human,
+          inference_ms: data.inference_ms,
+          model_version: data.model_version,
+        };
       }
-      if (data.prediction) {
-        prediction = data.prediction;
-        if (!responseText) {
-          responseText = `Saya telah menganalisis gambar Anda. Berikut hasilnya:`;
-        }
-      }
-      if (!responseText) {
-        responseText = "Maaf, saya tidak mendapatkan respons dari server.";
-      }
 
-      const assistantMsg = {
-        id: assistantId,
-        role: "assistant",
-        text: responseText,
-        prediction,
-      };
+      const botText = data.chatbot_message || (prediction ? `Objek teridentifikasi sebagai ${labelOf(prediction.predicted)}.` : "Permintaan selesai.");
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          text: botText,
+          prediction,
+        },
+      ]);
+      loadFeedbackStats();
     } catch (err) {
-      const errMsg = {
-        id: assistantId,
-        role: "assistant",
-        text: `⚠️ Terjadi kesalahan: ${err?.message ?? "Gagal menghubungi server."}`,
-        prediction: null,
-      };
-      setMessages((prev) => [...prev, errMsg]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          text: `Gagal memproses permintaan: ${err.message || "Server tidak merespons."}`,
+          prediction: null,
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   }
 
-  /* ── submit feedback ── */
-  async function submitFeedback(
-    messageId,
-    isCorrect,
-    correctLabel = "",
-    showInput = false,
-    inputOnly = false
-  ) {
-    // if just toggling the "Salah" panel or typing in the input, update UI state only
+  async function handleFeedback(predId, origLabel, labelInput, isCorrect, showInput = false, inputOnly = false) {
     if (showInput && !inputOnly) {
-      // "Salah" button clicked — reveal input
       setFeedbackStates((prev) => ({
         ...prev,
-        [messageId]: {
-          showing: true,
-          labelInput: prev[messageId]?.labelInput ?? "",
-          submitted: false,
-        },
+        [predId]: { showing: true, labelInput: prev[predId]?.labelInput || "", submitted: false },
       }));
       return;
     }
 
     if (inputOnly) {
-      // user is typing the correction label
       setFeedbackStates((prev) => ({
         ...prev,
-        [messageId]: {
-          ...prev[messageId],
-          labelInput: correctLabel ?? "",
-        },
+        [predId]: { ...prev[predId], labelInput: labelInput || "" },
       }));
       return;
     }
 
-    // actual submission
-    const msg = messages.find((m) => m.id === messageId);
-    if (!msg) return;
-    const pred = msg.prediction;
-    if (!pred) return;
-
-    const original_label = pred.predicted;
-    const finalCorrect = isCorrect ? original_label : (correctLabel || "").trim();
-
     try {
       await api.submitFeedback({
-        prediction_id: pred.prediction_id ?? null,
-        original_label,
-        correct_label: finalCorrect,
+        prediction_id: predId,
+        original_label: origLabel,
+        correct_label: isCorrect ? origLabel : (labelInput || origLabel),
         is_correct: isCorrect,
-        image_path: null,
       });
-    } catch (_) {
-      // best-effort; still mark submitted so user sees confirmation
-    }
 
-    setFeedbackStates((prev) => ({
-      ...prev,
-      [messageId]: {
-        showing: false,
-        labelInput: "",
-        submitted: true,
-      },
-    }));
+      setFeedbackStates((prev) => ({
+        ...prev,
+        [predId]: { showing: false, labelInput: "", submitted: true },
+      }));
+      loadFeedbackStats();
+    } catch (e) {
+      alert(`Gagal menyimpan feedback: ${e.message}`);
+    }
   }
 
-  /* ── render ── */
-  return (
-    <>
-      {/* keyframe injection */}
-      <style>{`
-        @keyframes typingBounce {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
-          40%            { transform: translateY(-6px); opacity: 1; }
+  async function handleRetrainTrigger() {
+    try {
+      setRetrainStatus({ status: "running", message: "Menginisialisasi retraining..." });
+      const res = await api.retrainModel();
+      setRetrainStatus({ status: "running", message: res.message || "Retraining sedang berjalan." });
+      // Polling status singkat
+      setTimeout(async () => {
+        try {
+          const s = await api.retrainStatus();
+          setRetrainStatus(s);
+        } catch {
+          // ignore
         }
-      `}</style>
+      }, 3000);
+    } catch (e) {
+      setRetrainStatus({ status: "error", message: e.message });
+    }
+  }
 
-      <div
-        className="bento-card"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          height: "70vh",
-        }}
-      >
-        {/* header */}
-        <div className="card-header">
-          <span className="card-label">Chat AI</span>
-          <span className="card-label">Image Classifier</span>
+  return (
+    <section className="chat-shell">
+      {/* ── Left Column: Chat Terminal ── */}
+      <div className="bento-card chat-card">
+        <div className="chat-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="card-status-dot" />
+            <span className="card-label">Terminal Inferensi Interaktif</span>
+          </div>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>
+            PORT: 8000 / DUAL ENGINE
+          </span>
         </div>
 
-        {/* messages container */}
-        <div
-          ref={messagesEndRef}
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "1rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
-          }}
-        >
-          {messages.map((msg) =>
-            msg.role === "user" ? (
-              <UserBubble key={msg.id} message={msg} />
-            ) : (
-              <AssistantBubble
-                key={msg.id}
-                message={msg}
-                onFeedback={submitFeedback}
-                feedbackState={feedbackStates[msg.id]}
-              />
-            )
+        <div className="chat-scroll-area">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`chat-bubble-row ${msg.role}`}>
+              <div className="chat-badge-avatar">
+                {msg.role === "user" ? "USR" : "SYS"}
+              </div>
+
+              <div className="chat-bubble-content">
+                {msg.imageUrl && (
+                  <img src={msg.imageUrl} alt="Lampiran input" className="chat-image-preview" />
+                )}
+                <div>{msg.text}</div>
+
+                {msg.prediction && (
+                  <PredictionCard
+                    prediction={msg.prediction}
+                    feedbackState={feedbackStates[msg.prediction.prediction_id]}
+                    onFeedback={handleFeedback}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="chat-bubble-row assistant">
+              <div className="chat-badge-avatar">SYS</div>
+              <div className="chat-bubble-content" style={{ padding: "8px 14px" }}>
+                <div className="pulse-loader">
+                  <span className="pulse-dot" />
+                  <span className="pulse-dot" />
+                  <span className="pulse-dot" />
+                </div>
+              </div>
+            </div>
           )}
-          {isLoading && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
 
-        {/* input bar */}
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            padding: "0.75rem",
-            display: "flex",
-            gap: "0.5rem",
-            alignItems: "flex-end",
-          }}
-        >
+        {/* Input Bar */}
+        <div className="chat-input-bar">
           {previewUrl && (
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              <img
-                src={previewUrl}
-                alt="preview"
-                style={{
-                  width: 40,
-                  height: 40,
-                  objectFit: "cover",
-                  borderRadius: 4,
-                  border: "1px solid var(--border)",
-                }}
-              />
+            <div className="chat-attachment-strip">
+              <img src={previewUrl} alt="Thumbnail" className="chat-attachment-thumb" />
+              <span className="chat-attachment-name">{selectedFile?.name || "lampiran_citra.jpg"}</span>
               <button
-                onClick={() => {
-                  setSelectedFile(null);
-                  setPreviewUrl(null);
-                }}
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  color: "#fff",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-                title="Hapus gambar"
+                type="button"
+                className="chat-attachment-remove"
+                onClick={clearSelectedFile}
+                title="Hapus lampiran"
               >
-                ✕
+                <IconClose />
               </button>
             </div>
           )}
 
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Ketik pesan atau tanya tentang gambar..."
-            style={{
-              flex: 1,
-              resize: "none",
-              minHeight: 40,
-              maxHeight: 120,
-              padding: "0.5rem",
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              color: "var(--text-primary)",
-              fontFamily: "inherit",
-              fontSize: "0.9rem",
-              lineHeight: 1.5,
-              outline: "none",
-            }}
-            rows={1}
-          />
+          <div className="chat-input-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleFileSelection(e.target.files[0]);
+              }}
+            />
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => handleFileSelect(e.target.files[0])}
-          />
+            <button
+              type="button"
+              className="btn-icon-tactile"
+              onClick={() => fileInputRef.current?.click()}
+              title="Lampirkan berkas citra"
+            >
+              <IconCamera />
+            </button>
 
-          <button
-            className="btn-secondary"
-            onClick={() => fileInputRef.current?.click()}
-            title="Unggah gambar"
-            style={{ flexShrink: 0 }}
-          >
-            📷
-          </button>
+            <textarea
+              className="chat-textarea"
+              rows={1}
+              placeholder="Ketik instruksi atau lampirkan citra..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            />
 
-          <button
-            className="btn-shimmer-cta"
-            onClick={sendMessage}
-            disabled={isLoading && !inputText && !selectedFile}
-            style={{ flexShrink: 0 }}
-          >
-            Kirim
-          </button>
+            <button
+              type="button"
+              className="btn-shimmer-cta"
+              disabled={isLoading || (!inputText.trim() && !selectedFile)}
+              onClick={sendMessage}
+              style={{ flex: "none", width: 42, height: 42, padding: 0 }}
+              title="Kirim pesan"
+            >
+              <IconSend />
+            </button>
+          </div>
         </div>
       </div>
-    </>
+
+      {/* ── Right Column: Telemetry & Active Learning Sidebar ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="bento-card" style={{ padding: 20 }}>
+          <div className="card-header">
+            <span className="card-label">Konfigurasi Model</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#4ade80" }}>ONLINE</span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "var(--text-tertiary)" }}>Primary Engine</span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>MobileNetV3</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "var(--text-tertiary)" }}>Fallback Engine</span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>Arun-D CNN</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "var(--text-tertiary)" }}>Deteksi Manusia</span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-amber)" }}>TERPASANG</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "var(--text-tertiary)" }}>Total Kategori</span>
+              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>1.000+ Kelas</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bento-card" style={{ padding: 20 }}>
+          <div className="card-header">
+            <span className="card-label">Active Learning Buffer</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>RETRAIN PIPELINE</span>
+          </div>
+
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 4 }}>
+            Setiap koreksi yang Anda masukkan akan disimpan ke dataset lokal untuk melatih ulang head klasifikasi tanpa merusak bobot model utama.
+          </p>
+
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleRetrainTrigger}
+              disabled={retrainStatus.status === "running"}
+              style={{ width: "100%", fontSize: 11, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}
+            >
+              {retrainStatus.status === "running" ? "MEMPROSES RETRAINING..." : "JALANKAN FINE-TUNING"}
+            </button>
+            {retrainStatus.message && (
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", marginTop: 8, lineHeight: 1.4 }}>
+                {retrainStatus.message}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

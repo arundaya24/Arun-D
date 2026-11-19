@@ -22,7 +22,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  /** POST /api/predict — multipart form with "file" */
+  /** POST /api/predict: multipart form with "file" */
   predict(file) {
     const form = new FormData();
     form.append("file", file);
@@ -55,7 +55,7 @@ export const api = {
   },
 
   /**
-   * POST /api/chat — multipart form with "message" and optional "file"
+   * POST /api/chat: multipart form with "message" and optional "file"
    * @param {string} message
    * @param {File|null} file
    */
@@ -67,7 +67,7 @@ export const api = {
   },
 
   /**
-   * POST /api/feedback — JSON body
+   * POST /api/feedback: JSON body
    * @param {object} data
    */
   submitFeedback(data) {
@@ -76,6 +76,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+  },
+
+  /** GET /api/feedback/stats */
+  chatStats() {
+    return request("/api/feedback/stats");
   },
 
   /** POST /api/retrain */
@@ -90,10 +95,14 @@ export const api = {
 };
 
 // ---------------------------------------------------------------------------
-// Indonesian label map — CIFAR-10 + 80+ common ImageNet labels
+// Indonesian label map: CIFAR-10 + Human + 80+ ImageNet labels
 // ---------------------------------------------------------------------------
 export const LABEL_ID = {
-  // ── CIFAR-10 ──────────────────────────────────────────────────────────────
+  // Human detection
+  human:       "Manusia",
+  person:      "Manusia",
+
+  // CIFAR-10
   airplane:    "Pesawat",
   automobile:  "Mobil",
   bird:        "Burung",
