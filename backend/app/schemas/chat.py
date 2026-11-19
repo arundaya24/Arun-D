@@ -1,8 +1,11 @@
+from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .prediction import PredictionResult
+
+Role = Literal["system", "user", "assistant"]
 
 
 class TopKItem(BaseModel):
@@ -42,3 +45,30 @@ class RetrainStatus(BaseModel):
     message: str
     trained_on: Optional[int] = None
     new_classes: Optional[List[str]] = None
+
+
+class ChatRequest(BaseModel):
+    conversation_id: Optional[int] = None
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    role: Role
+    content: str
+    created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationDetail(ConversationOut):
+    messages: List[MessageOut]

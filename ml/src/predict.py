@@ -37,7 +37,6 @@ class Predictor:
             )
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
-        # 1. Muat Arun-D Primary Model
         ckpt = torch.load(path, map_location=self.device, weights_only=True)
         self.cfg = ckpt["config"]
         self.classes: list[str] = ckpt["classes"]
@@ -47,7 +46,6 @@ class Predictor:
         self.model.eval()
         self.transform = get_eval_transform(self.cfg)
 
-        # 2. Inisialisasi Hybrid Model (MobileNetV3) jika bobot & kelas tersedia
         self._hybrid_model = None
         self._hybrid_classes: list[str] = []
         self._hybrid_transform = None
@@ -99,7 +97,6 @@ class Predictor:
         try:
             arr = np.array(image.convert("RGB"))
             ycrcb = cv2.cvtColor(arr, cv2.COLOR_RGB2YCrCb)
-            # Rentang warna kulit standar YCrCb: Cr [133..173], Cb [77..127]
             skin_mask = (
                 (ycrcb[:, :, 1] >= 133) & (ycrcb[:, :, 1] <= 173) &
                 (ycrcb[:, :, 2] >= 77) & (ycrcb[:, :, 2] <= 127)
@@ -199,17 +196,14 @@ class Predictor:
         else:
             base_result = self.predict(img, top_k)
 
-        # Evaluasi deteksi manusia
         is_human, human_conf, subtype = self.detect_human(img, base_result.get("top_k", []))
         base_result["is_human"] = is_human
 
         if is_human:
-            # Jika terdeteksi manusia dengan sinyal kuat atau model kurang yakin pada objek lain
             if subtype or human_conf >= 0.65 or base_result["confidence"] < 0.60:
                 old_label = base_result["predicted"]
                 base_result["predicted"] = "human"
                 base_result["confidence"] = max(base_result["confidence"], human_conf)
-                # Perbarui daftar top_k
                 existing = [item for item in base_result.get("top_k", []) if item["label"] != "human"]
                 base_result["top_k"] = [{"label": "human", "score": human_conf}] + existing[:2]
                 base_result["is_uncertain"] = base_result["confidence"] < 0.60
