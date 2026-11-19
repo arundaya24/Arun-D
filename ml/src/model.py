@@ -39,6 +39,7 @@ class ArunDCNN(nn.Module):
         in_channels: int = 3,
     ) -> None:
         super().__init__()
+        self.num_classes = num_classes
         blocks, prev = [], in_channels
         for ch in channels:
             blocks.append(conv_block(prev, ch, dropout))
@@ -58,21 +59,161 @@ class ArunDCNN(nn.Module):
                 nn.init.zeros_(m.bias)
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.zeros_(m.bias)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
         x = self.pool(x).flatten(1)
         return self.classifier(x)
 
+    def expand_classes(self, new_num_classes: int) -> None:
+        """Ekspansi linear head untuk mendukung penambahan kelas baru tanpa merusak bobot lama."""
+        if new_num_classes <= self.num_classes:
+            return
+        old_linear = self.classifier
+        in_feat = old_linear.in_features
+        new_linear = nn.Linear(in_feat, new_num_classes)
+        with torch.no_grad():
+            new_linear.weight[:self.num_classes] = old_linear.weight
+            new_linear.bias[:self.num_classes] = old_linear.bias
+            nn.init.normal_(new_linear.weight[self.num_classes:], 0, 0.01)
+            nn.init.zeros_(new_linear.bias[self.num_classes:])
+        self.classifier = new_linear
+        self.num_classes = new_num_classes
+
 
 ArunaCNN = ArunDCNN
 
 
-def build_model(cfg: dict) -> ArunDCNN:
-    m = cfg["model"]
-    return ArunDCNN(
-        num_classes=m["num_classes"],
-        channels=tuple(m["channels"]),
-        dropout=m["dropout"],
-    )
+# --- Arsitektur Enhanced dengan Residual Connection & Squeeze-and-Excitation (SE) ---
+
+class SEBlock(nn.Module):
+    """Squeeze-and-Excitation block untuk kalibrasi channel secara adaptif."""
+    def __init__(self, channels: int, reduction: int = 16) -> None:
+        super().__init__()
+        reduced = max(channels // reduction, 8)
+        self.fc = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(channels, reduced, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(reduced, channels, bias=False),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, _, _ = x.shape
+        w = self.fc(x).view(b, c, 1, 1)
+        return x * w
+
+
+class ResidualSEBlock(nn.Module):
+    """Blok Residual + SE untuk akurasi lebih tinggi dan representasi fitur kaya."""
+    def __init__(self, in_ch: int, out_ch: int, stride: int = 1, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_ch)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_ch)
+        self.se = SEBlock(out_ch)
+        self.dropout = nn.Dropout2d(dropout) if dropout > 0 else nn.Identity()
+
+        if stride != 1 or in_ch != out_ch:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_ch),
+            )
+        else:
+            self.shortcut = nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        res = self.shortcut(x)
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out = self.se(out)
+        out = self.dropout(out)
+        out = self.relu(out + res)
+        return out
+
+
+class EnhancedArunCNN(nn.Module):
+    """CNN modern dengan Residual SE blocks dan dynamic classification head."""
+    def __init__(
+        self,
+        num_classes: int = 10,
+        stages: tuple[int, ...] = (64, 128, 256),
+        dropout: float = 0.2,
+        in_channels: int = 3,
+    ) -> None:
+        super().__init__()
+        self.num_classes = num_classes
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, stages[0], kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(stages[0]),
+            nn.ReLU(inplace=True),
+        )
+        layers = []
+        in_ch = stages[0]
+        for idx, out_ch in enumerate(stages):
+            stride = 1 if idx == 0 else 2
+            layers.append(ResidualSEBlock(in_ch, out_ch, stride=stride, dropout=dropout))
+            layers.append(ResidualSEBlock(out_ch, out_ch, stride=1, dropout=dropout))
+            in_ch = out_ch
+
+        self.stages = nn.Sequential(*layers)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.head_dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(stages[-1], num_classes)
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.stem(x)
+        x = self.stages(x)
+        x = self.pool(x).flatten(1)
+        x = self.head_dropout(x)
+        return self.classifier(x)
+
+    def expand_classes(self, new_num_classes: int) -> None:
+        """Ekspansi classifier head untuk penambahan kategori secara dinamis."""
+        if new_num_classes <= self.num_classes:
+            return
+        old_linear = self.classifier
+        in_feat = old_linear.in_features
+        new_linear = nn.Linear(in_feat, new_num_classes)
+        with torch.no_grad():
+            new_linear.weight[:self.num_classes] = old_linear.weight
+            new_linear.bias[:self.num_classes] = old_linear.bias
+            nn.init.normal_(new_linear.weight[self.num_classes:], 0, 0.01)
+            nn.init.zeros_(new_linear.bias[self.num_classes:])
+        self.classifier = new_linear
+        self.num_classes = new_num_classes
+
+
+def build_model(cfg: dict) -> nn.Module:
+    m = cfg.get("model", {})
+    arch = m.get("architecture", "arun_d")
+    num_classes = m.get("num_classes", 10)
+
+    if arch == "enhanced":
+        stages = tuple(m.get("stages", m.get("channels", [64, 128, 256])))
+        dropout = m.get("dropout", 0.2)
+        return EnhancedArunCNN(num_classes=num_classes, stages=stages, dropout=dropout)
+
+    # Default fallback to ArunDCNN baseline
+    channels = tuple(m.get("channels", [64, 128, 256]))
+    dropout = m.get("dropout", 0.3)
+    return ArunDCNN(num_classes=num_classes, channels=channels, dropout=dropout)
