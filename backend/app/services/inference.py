@@ -24,3 +24,14 @@ def get_predictor():
                 except FileNotFoundError as e:
                     raise HTTPException(status_code=503, detail=str(e)) from e
     return _predictor
+
+
+def reload_predictor():
+    """Memperbarui instance Predictor setelah retraining agar memakai model terbaru."""
+    global _predictor
+    with _lock:
+        try:
+            from ml.src.predict import Predictor
+            _predictor = Predictor(get_settings().model_dir)
+        except Exception:
+            _predictor = None

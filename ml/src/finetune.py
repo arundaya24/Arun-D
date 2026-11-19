@@ -101,7 +101,8 @@ def fine_tune_from_corrections(
             "message": "Tidak ada data koreksi untuk retraining.",
         }
 
-    new_classes = [c for c in summary["by_class"] if c not in classes]
+    existing_classes_lower = {c.lower() for c in classes}
+    new_classes = [c for c in summary["by_class"] if c.lower() not in existing_classes_lower]
     if new_classes:
         classes.extend(new_classes)
 
@@ -109,12 +110,13 @@ def fine_tune_from_corrections(
     model = build_model(cfg).to(dev)
     # Jika jumlah kelas bertambah, ekspansi head
     if len(classes) > model.num_classes:
-        # Load bobot yang cocok dulu
-        old_classes_count = model.num_classes
         model.load_state_dict(ckpt["state_dict"])
         model.expand_classes(len(classes))
     else:
         model.load_state_dict(ckpt["state_dict"])
+
+    # Pastikan seluruh layer dan bobot berada pada target device
+    model.to(dev)
 
     # 4. Freeze feature extraction layers agar bobot representasi tidak rusak
     for name, param in model.named_parameters():
@@ -145,7 +147,7 @@ def fine_tune_from_corrections(
         lr=lr,
         weight_decay=1e-4,
     )
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().to(dev)
 
     model.train()
     final_loss = 0.0

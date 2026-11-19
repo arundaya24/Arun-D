@@ -238,6 +238,11 @@ def _run_retraining_task():
             artifacts_dir="ml/artifacts",
             epochs=5,
         )
+        try:
+            from backend.app.services.inference import reload_predictor
+            reload_predictor()
+        except Exception:
+            pass
         with _retrain_lock:
             _retrain_status["status"] = "success"
             _retrain_status["message"] = f"Retraining selesai. Total sampel: {res['trained_on']}. Versi: {res.get('model_version')}"

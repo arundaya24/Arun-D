@@ -27,6 +27,32 @@ def test_expand_classes_preserves_old_weights():
     assert torch.allclose(m.classifier.bias[:5], old_bias)
 
 
+def test_expand_classes_device_consistency():
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    m = ArunDCNN(num_classes=5, channels=(16, 32)).to(device)
+    m.expand_classes(8)
+    assert m.classifier.weight.device.type == device.type
+    assert m.classifier.bias.device.type == device.type
+    x = torch.randn(2, 3, 32, 32, device=device)
+    out = m(x)
+    assert out.shape == (2, 8)
+    assert out.device.type == device.type
+
+
+def test_enhanced_expand_classes_device_consistency():
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    m = EnhancedArunCNN(num_classes=4, stages=(16, 32)).to(device)
+    old_w = m.classifier.weight.data.clone()
+    m.expand_classes(6)
+    assert m.classifier.weight.device.type == device.type
+    assert m.classifier.bias.device.type == device.type
+    assert torch.allclose(m.classifier.weight[:4], old_w)
+    x = torch.randn(2, 3, 32, 32, device=device)
+    out = m(x)
+    assert out.shape == (2, 6)
+    assert out.device.type == device.type
+
+
 def test_backward_gives_gradients():
     m = ArunDCNN(num_classes=10)
     loss = torch.nn.functional.cross_entropy(m(torch.randn(8, 3, 32, 32)), torch.randint(0, 10, (8,)))

@@ -73,12 +73,16 @@ class ArunDCNN(nn.Module):
             return
         old_linear = self.classifier
         in_feat = old_linear.in_features
-        new_linear = nn.Linear(in_feat, new_num_classes)
+        device = old_linear.weight.device
+        dtype = old_linear.weight.dtype
+        new_linear = nn.Linear(in_feat, new_num_classes, device=device, dtype=dtype)
         with torch.no_grad():
             new_linear.weight[:self.num_classes] = old_linear.weight
-            new_linear.bias[:self.num_classes] = old_linear.bias
+            if old_linear.bias is not None and new_linear.bias is not None:
+                new_linear.bias[:self.num_classes] = old_linear.bias
             nn.init.normal_(new_linear.weight[self.num_classes:], 0, 0.01)
-            nn.init.zeros_(new_linear.bias[self.num_classes:])
+            if new_linear.bias is not None:
+                nn.init.zeros_(new_linear.bias[self.num_classes:])
         self.classifier = new_linear
         self.num_classes = new_num_classes
 
@@ -193,12 +197,16 @@ class EnhancedArunCNN(nn.Module):
             return
         old_linear = self.classifier
         in_feat = old_linear.in_features
-        new_linear = nn.Linear(in_feat, new_num_classes)
+        device = old_linear.weight.device
+        dtype = old_linear.weight.dtype
+        new_linear = nn.Linear(in_feat, new_num_classes, device=device, dtype=dtype)
         with torch.no_grad():
             new_linear.weight[:self.num_classes] = old_linear.weight
-            new_linear.bias[:self.num_classes] = old_linear.bias
+            if old_linear.bias is not None and new_linear.bias is not None:
+                new_linear.bias[:self.num_classes] = old_linear.bias
             nn.init.normal_(new_linear.weight[self.num_classes:], 0, 0.01)
-            nn.init.zeros_(new_linear.bias[self.num_classes:])
+            if new_linear.bias is not None:
+                nn.init.zeros_(new_linear.bias[self.num_classes:])
         self.classifier = new_linear
         self.num_classes = new_num_classes
 
