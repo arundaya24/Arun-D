@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import history, model_info, predict, stats
+from backend.app.api import chat, history, model_info, predict, stats
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, engine
 from backend.app import models  # noqa: F401  (mendaftarkan tabel)
@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (predict.router, history.router, stats.router, model_info.router):
+for r in (predict.router, chat.router, history.router, stats.router, model_info.router):
     app.include_router(r)
 
 

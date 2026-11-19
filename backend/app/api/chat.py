@@ -1,236 +1,268 @@
+"""Router untuk endpoint Chat AI, Feedback koreksi, dan Retraining active learning."""
+from __future__ import annotations
+
+import concurrent.futures
+from datetime import datetime
 import os
+from pathlib import Path
 import shutil
 import threading
-import concurrent.futures
-from pathlib import Path
+import uuid
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
-from backend.app.models import Prediction, Feedback
-from backend.app.schemas.chat import ChatBotResponse, FeedbackRequest, FeedbackResponse, RetrainStatus
+from backend.app.models import Feedback, Prediction
+from backend.app.schemas.chat import (
+    ChatBotResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    RetrainStatus,
+    TopKItem,
+)
 from backend.app.services.inference import get_predictor
 from ml.src.errors import ImageDecodeError
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp", "image/gif", "image/tiff"}
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
+UPLOAD_DIR = Path("ml/data/uploads")
+CORRECTIONS_DIR = Path("ml/data/corrections")
 
 _retrain_status: dict = {
     "status": "idle",
-    "message": "Belum ada retraining",
+    "message": "Belum ada proses retraining yang berjalan.",
     "trained_on": None,
     "new_classes": None,
 }
 _retrain_lock = threading.Lock()
 
 
-# ---------------------------------------------------------------------------
-# POST /api/chat
-# ---------------------------------------------------------------------------
-
 @router.post("/chat", response_model=ChatBotResponse)
 async def chat(
-    file: UploadFile = File(None),
+    file: Optional[UploadFile] = File(None),
     message: str = Form(""),
     db: Session = Depends(get_db),
     predictor=Depends(get_predictor),
 ):
-    settings = get_settings()
-
-    # ── Branch 1: image provided and content-type is allowed ──────────────
+    # Kasus 1: User mengirimkan gambar
     if file is not None and file.content_type in ALLOWED_TYPES:
+        max_bytes = get_settings().max_upload_mb * 1024 * 1024
+        data = await file.read()
+        if len(data) > max_bytes:
+            raise HTTPException(413, f"Ukuran file melebihi {get_settings().max_upload_mb} MB.")
+        if not data:
+            raise HTTPException(400, "File gambar kosong.")
+
         try:
-            data = await file.read()
             result = predictor.predict_bytes(data, top_k=3)
-        except ImageDecodeError as exc:
-            raise HTTPException(status_code=422, detail=f"Gambar tidak dapat dibaca: {exc}") from exc
+        except ImageDecodeError as e:
+            raise HTTPException(400, str(e)) from e
 
-        predicted: str = result["label"]
-        confidence: float = result["confidence"]
-        top_k: list = result.get("top_k", [])
-        confidence_pct = round(confidence * 100, 1)
+        # Simpan file sementara agar bisa disimpan jika user memberikan koreksi
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        ext = Path(file.filename or "img.jpg").suffix or ".jpg"
+        saved_filename = f"{uuid.uuid4().hex[:12]}{ext}"
+        saved_path = UPLOAD_DIR / saved_filename
+        with open(saved_path, "wb") as f_out:
+            f_out.write(data)
 
-        # Persist prediction to DB
-        pred_row = Prediction(
-            predicted_label=predicted,
-            confidence=confidence,
-            top_k=top_k,
-            image_path=result.get("image_path"),
+        # Simpan ke tabel Prediction
+        row = Prediction(
+            filename=(file.filename or "unknown")[:255],
+            predicted=result["predicted"],
+            confidence=result["confidence"],
+            top_k_json=result["top_k"],
+            inference_ms=result["inference_ms"],
+            model_version=result["model_version"],
         )
-        db.add(pred_row)
+        db.add(row)
         db.commit()
-        db.refresh(pred_row)
+        db.refresh(row)
 
-        # Build chatbot message based on confidence threshold
-        if confidence >= 0.60:
-            chatbot_message = (
-                f"Saya cukup yakin ini adalah **{predicted}** "
-                f"(keyakinan: {confidence_pct}%). "
-                "Ada yang ingin dikonfirmasi atau dikoreksi?"
+        predicted = result["predicted"]
+        conf_pct = round(result["confidence"] * 100, 1)
+        is_low_conf = result.get("is_uncertain", result["confidence"] < 0.60)
+
+        # Logika tangani ketidakpastian secara jujur
+        if is_low_conf:
+            bot_text = (
+                f"Saya kurang yakin, namun tebakan terdekat saya adalah **{predicted}** ({conf_pct}%). "
+                f"Bisa tolong konfirmasi apakah ini benar gambar {predicted}, atau beri tahu saya objek sebenarnya jika salah?"
             )
         else:
-            chatbot_message = (
-                f"Saya kurang yakin, tapi mungkin ini **{predicted}** "
-                f"({confidence_pct}%). "
-                "Bisa tolong konfirmasi apakah prediksi ini benar?"
+            bot_text = (
+                f"Saya cukup yakin ini adalah **{predicted}** (keyakinan: {conf_pct}%). "
+                f"Apakah hasil ini sudah sesuai? Anda dapat menekan 'Benar' atau memberikan label koreksi jika salah."
             )
 
+        top_k_items = [TopKItem(label=item["label"], score=item["score"]) for item in result.get("top_k", [])]
+
         return ChatBotResponse(
-            id=pred_row.id,
-            predicted_label=predicted,
-            confidence=confidence,
-            confidence_pct=confidence_pct,
-            top_k=top_k,
-            image_path=pred_row.image_path,
-            chatbot_message=chatbot_message,
+            prediction_id=row.id,
+            chatbot_message=bot_text,
+            predicted=predicted,
+            confidence=result["confidence"],
+            top_k=top_k_items,
+            engine_used=result.get("engine_used", "arun_d_cnn"),
+            is_low_confidence=is_low_conf,
+            inference_ms=result["inference_ms"],
+            model_version=result["model_version"],
         )
 
-    # ── Branch 2: no file or disallowed type – text-only response ─────────
-    msg_lower = message.lower()
+    # Kasus 2: Pesan teks saja tanpa gambar
+    msg_lower = message.strip().lower()
 
-    if any(kw in msg_lower for kw in ("gambar apa", "apa ini", "ini apa", "apa gambar", "tebak")):
-        msg = "Silakan unggah gambar terlebih dahulu, lalu saya akan menganalisisnya! 📷"
-    elif any(kw in msg_lower for kw in ("halo", "hai", "hello")):
-        msg = (
-            "Halo! Saya siap membantu mengklasifikasikan gambar Anda. "
-            "Unggah gambar dan saya akan memberitahu apa isinya!"
-        )
-    elif any(kw in msg_lower for kw in ("terima kasih", "makasih")):
-        msg = "Sama-sama! Jika ada gambar lain yang ingin dianalisis, silakan unggah kapan saja. 😊"
+    if any(q in msg_lower for q in ("ini gambar apa", "apa ini", "ini apa", "gambar apa", "tebak gambar")):
+        reply = "Silakan unggah gambar terlebih dahulu dengan tombol ikon kamera/file di samping, lalu saya akan langsung menganalisisnya! 📷"
+    elif any(g in msg_lower for g in ("halo", "hai", "hei", "pagi", "siang", "sore", "malam")):
+        reply = "Halo! Saya adalah AI asisten pengenal gambar Arun-D. Unggah foto objek apa saja, dan saya akan menebaknya beserta skor keyakinan."
+    elif any(t in msg_lower for t in ("terima kasih", "makasih", "thanks")):
+        reply = "Sama-sama! Senang bisa membantu. Jika ada gambar lain yang ingin diidentifikasi, silakan kirimkan kapan saja."
+    elif not msg_lower:
+        reply = "Ada yang bisa saya bantu? Unggah gambar atau tanyakan sesuatu."
     else:
-        msg = (
-            "Saya adalah asisten klasifikasi gambar. "
-            "Unggah gambar untuk saya analisis, atau tanyakan sesuatu tentang hasil prediksi!"
+        reply = (
+            f"Saya mengerti: \"{message}\". "
+            "Untuk mengenali objek, silakan lampirkan gambar dengan menekan ikon kamera di samping kolom chat."
         )
 
-    return ChatBotResponse(chatbot_message=msg)
+    return ChatBotResponse(
+        chatbot_message=reply,
+        engine_used="chat_engine",
+        is_low_confidence=False,
+    )
 
-
-# ---------------------------------------------------------------------------
-# POST /api/feedback
-# ---------------------------------------------------------------------------
 
 @router.post("/feedback", response_model=FeedbackResponse)
 def submit_feedback(
-    body: FeedbackRequest,
+    payload: FeedbackRequest,
     db: Session = Depends(get_db),
 ):
+    """Menyimpan feedback pengguna untuk active learning."""
+    clean_label = payload.correct_label.strip().lower()
     correction_saved = False
+    saved_target_path = None
 
-    feedback_row = Feedback(
-        prediction_id=body.prediction_id,
-        is_correct=body.is_correct,
-        correct_label=body.correct_label,
-        image_path=body.image_path,
-        comment=body.comment,
+    # Jika salah, simpan gambar ke dataset koreksi ml/data/corrections/<label>/
+    if not payload.is_correct and clean_label:
+        dest_dir = CORRECTIONS_DIR / clean_label
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Cari file dari prediction_id jika ada
+        if payload.prediction_id:
+            pred = db.get(Prediction, payload.prediction_id)
+            if pred and UPLOAD_DIR.exists():
+                # Cari berkas terbaru di UPLOAD_DIR
+                upload_files = sorted(UPLOAD_DIR.glob("*"), key=os.path.getmtime, reverse=True)
+                if upload_files:
+                    src_file = upload_files[0]
+                    target_file = dest_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{src_file.name}"
+                    try:
+                        shutil.copy2(src_file, target_file)
+                        saved_target_path = str(target_file)
+                        correction_saved = True
+                    except Exception:
+                        pass
+
+    fb_row = Feedback(
+        prediction_id=payload.prediction_id,
+        original_label=payload.original_label[:100],
+        correct_label=clean_label[:100] if clean_label else payload.original_label[:100],
+        image_path=saved_target_path,
+        is_correct=payload.is_correct,
     )
-    db.add(feedback_row)
+    db.add(fb_row)
     db.commit()
-    db.refresh(feedback_row)
+    db.refresh(fb_row)
 
-    # Copy image to corrections folder when feedback is a correction
-    if not body.is_correct and body.correct_label and body.image_path:
-        try:
-            corrections_dir = Path("ml") / "data" / "corrections" / body.correct_label
-            corrections_dir.mkdir(parents=True, exist_ok=True)
-
-            src = Path(body.image_path)
-            if src.exists():
-                dest = corrections_dir / src.name
-                shutil.copy2(src, dest)
-                correction_saved = True
-        except Exception:
-            # Non-fatal: feedback is already saved to DB
-            correction_saved = False
+    msg = (
+        "Terima kasih atas konfirmasinya! 👍"
+        if payload.is_correct
+        else f"Terima kasih atas koreksinya! Label '{clean_label}' telah disimpan untuk melatih ulang AI agar lebih pintar."
+    )
 
     return FeedbackResponse(
-        id=feedback_row.id,
-        message="Terima kasih atas koreksinya! Data akan digunakan untuk meningkatkan akurasi model.",
+        id=fb_row.id,
+        message=msg,
         correction_saved=correction_saved,
     )
 
 
-# ---------------------------------------------------------------------------
-# GET /api/feedback/stats
-# ---------------------------------------------------------------------------
-
 @router.get("/feedback/stats")
 def feedback_stats(db: Session = Depends(get_db)):
-    rows = db.query(Feedback).all()
-    total = len(rows)
+    """Mengambil ringkasan data koreksi yang masuk."""
+    total = db.scalar(select(func.count(Feedback.id))) or 0
+    correct_count = db.scalar(select(func.count(Feedback.id)).where(Feedback.is_correct == True)) or 0  # noqa: E712
+    wrong_count = total - correct_count
 
-    by_class: dict[str, int] = {}
-    for row in rows:
-        label = row.correct_label or "__no_correction__"
-        by_class[label] = by_class.get(label, 0) + 1
+    by_label = db.execute(
+        select(Feedback.correct_label, func.count(Feedback.id))
+        .where(Feedback.is_correct == False)  # noqa: E712
+        .group_by(Feedback.correct_label)
+        .order_by(func.count(Feedback.id).desc())
+    ).all()
 
     return {
-        "total": total,
-        "by_class": by_class,
+        "total_feedback": total,
+        "correct_predictions": correct_count,
+        "corrections_received": wrong_count,
+        "top_corrections": [{"label": row[0], "count": row[1]} for row in by_label[:10]],
     }
 
 
-# ---------------------------------------------------------------------------
-# Background retraining helpers
-# ---------------------------------------------------------------------------
-
-def _do_retrain() -> None:
-    """Run fine-tuning in a background thread and update global status."""
+def _run_retraining_task():
     global _retrain_status
-
     with _retrain_lock:
         _retrain_status["status"] = "running"
-        _retrain_status["message"] = "Retraining sedang berjalan…"
+        _retrain_status["message"] = "Sedang melatih ulang model dengan data koreksi..."
 
     try:
-        from ml.src.finetune import fine_tune_from_corrections  # local import to avoid circular deps
-
-        result = fine_tune_from_corrections()
-
+        from ml.src.finetune import fine_tune_from_corrections
+        res = fine_tune_from_corrections(
+            corrections_dir="ml/data/corrections",
+            artifacts_dir="ml/artifacts",
+            epochs=5,
+        )
         with _retrain_lock:
-            _retrain_status.update(
-                {
-                    "status": "done",
-                    "message": "Retraining selesai.",
-                    "trained_on": result.get("trained_on"),
-                    "new_classes": result.get("new_classes"),
-                }
-            )
-    except Exception as exc:  # noqa: BLE001
+            _retrain_status["status"] = "success"
+            _retrain_status["message"] = f"Retraining selesai! Dilatih pada {res['trained_on']} data. Versi baru: {res.get('model_version')}"
+            _retrain_status["trained_on"] = res["trained_on"]
+            _retrain_status["new_classes"] = res["new_classes"]
+    except Exception as e:
         with _retrain_lock:
-            _retrain_status.update(
-                {
-                    "status": "error",
-                    "message": f"Retraining gagal: {exc}",
-                }
-            )
+            _retrain_status["status"] = "error"
+            _retrain_status["message"] = f"Gagal retraining: {str(e)}"
 
-
-# ---------------------------------------------------------------------------
-# POST /api/retrain
-# ---------------------------------------------------------------------------
 
 @router.post("/retrain", response_model=RetrainStatus)
-def trigger_retrain():
+def trigger_retraining():
+    """Memulai proses fine-tuning model dari data koreksi user."""
+    global _retrain_status
     with _retrain_lock:
         if _retrain_status["status"] == "running":
-            raise HTTPException(status_code=409, detail="Retraining sedang berjalan")
+            raise HTTPException(409, "Proses retraining sedang berjalan di background.")
 
-    thread = threading.Thread(target=_do_retrain, daemon=True)
-    thread.start()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    executor.submit(_run_retraining_task)
 
-    return RetrainStatus(status="started", message="Retraining dimulai di background…")
+    return RetrainStatus(
+        status="started",
+        message="Proses retraining telah dimulai di latar belakang.",
+    )
 
-
-# ---------------------------------------------------------------------------
-# GET /api/retrain/status
-# ---------------------------------------------------------------------------
 
 @router.get("/retrain/status", response_model=RetrainStatus)
-def retrain_status():
+def get_retrain_status():
+    """Mengecek status proses retraining."""
     with _retrain_lock:
-        snapshot = dict(_retrain_status)
-    return RetrainStatus(**snapshot)
+        return RetrainStatus(
+            status=_retrain_status["status"],
+            message=_retrain_status["message"],
+            trained_on=_retrain_status.get("trained_on"),
+            new_classes=_retrain_status.get("new_classes"),
+        )

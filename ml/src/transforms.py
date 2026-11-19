@@ -30,3 +30,13 @@ def get_eval_transform(cfg: dict) -> T.Compose:
             T.Normalize(d["mean"], d["std"]),
         ]
     )
+
+
+def preprocess(image, image_size: int = 32, mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)):
+    """Helper transform dari PIL / array ke normalized tensor (3, H, W)."""
+    t = T.Compose([
+        T.Resize((image_size, image_size)),
+        T.ToTensor(),
+        T.Normalize(mean, std),
+    ])
+    return t(image)
