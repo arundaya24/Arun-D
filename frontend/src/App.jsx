@@ -1,11 +1,13 @@
 import { useState } from "react";
 import Predict from "./pages/Predict.jsx";
+import Chat from "./pages/Chat.jsx";
 import History from "./pages/History.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import LiquidCanvas from "./components/LiquidCanvas.jsx";
 
 const NAVIGATION_TABS = [
   { id: "predict", label: "Inferensi", view: Predict },
+  { id: "chat", label: "Chat AI", view: Chat },
   { id: "history", label: "Riwayat", view: History },
   { id: "dashboard", label: "Metrik", view: Dashboard },
 ];

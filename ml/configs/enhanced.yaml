@@ -1,0 +1,74 @@
+# =============================================================================
+# Arun-D Project — Enhanced Training Configuration
+# Architecture : EnhancedArunCNN
+# Config file  : ml/configs/enhanced.yaml
+# Created      : 2026-11-19
+# =============================================================================
+
+# Global random seed — ensures reproducibility across PyTorch, NumPy, and Python
+seed: 42
+
+# -----------------------------------------------------------------------------
+# DATA
+# Settings that control how raw images are loaded, split, and pre-processed.
+# -----------------------------------------------------------------------------
+data:
+  root: ml/data/raw          # Root directory that contains the raw image dataset
+  val_ratio: 0.1             # Fraction of training data reserved for validation (10 %)
+  num_workers: 2             # Number of parallel DataLoader worker processes
+  image_size: 64             # Height & width (px) images are resized to before training
+
+  # Per-channel normalisation statistics (pre-computed on the training set)
+  mean: [0.4914, 0.4822, 0.4465]   # RGB channel means  — used to zero-centre inputs
+  std:  [0.2470, 0.2435, 0.2616]   # RGB channel std devs — used to unit-scale inputs
+
+# -----------------------------------------------------------------------------
+# MODEL
+# Defines the EnhancedArunCNN architecture and its structural hyper-parameters.
+# -----------------------------------------------------------------------------
+model:
+  architecture: enhanced     # Selects the EnhancedArunCNN builder in the model registry
+  num_classes: 10            # Number of output classes (e.g. CIFAR-10 categories)
+
+  # Feature-map channel widths for each of the four convolutional stages.
+  # Doubles with each stage to progressively capture richer spatial features.
+  stages: [64, 128, 256, 512]
+
+  dropout: 0.2               # Dropout probability applied before the final classifier head
+
+# -----------------------------------------------------------------------------
+# TRAIN
+# All hyper-parameters that govern the training loop.
+# -----------------------------------------------------------------------------
+train:
+  epochs: 50                 # Maximum number of full passes over the training set
+  batch_size: 64             # Number of samples processed per gradient-update step
+
+  # --- Optimiser ---
+  optimizer: adam            # Optimiser type: adam | sgd | adamw
+  lr: 0.0005                 # Initial learning rate (5e-4 works well with Adam + cosine)
+  weight_decay: 0.0005       # L2 regularisation coefficient — penalises large weights
+  momentum: 0.9              # Momentum factor (used by SGD; retained here for reference)
+
+  # --- Learning-rate scheduler ---
+  scheduler: cosine          # LR decay policy: cosine | step | plateau | none
+                             # 'cosine' anneals LR from `lr` → 0 over all epochs
+
+  # --- Performance & stability ---
+  mixed_precision: true      # Enable AMP (fp16 forward/backward) for faster training
+                             # on CUDA devices; falls back to fp32 on CPU
+  grad_clip: 1.0             # Maximum global gradient-norm for clipping — prevents
+                             # exploding gradients during early training
+
+  # --- Early stopping ---
+  early_stopping_patience: 10  # Stop training if validation loss does not improve
+                               # for this many consecutive epochs
+
+# -----------------------------------------------------------------------------
+# OUTPUT
+# Controls where trained artefacts (checkpoints, logs, exports) are saved.
+# -----------------------------------------------------------------------------
+output:
+  dir: ml/artifacts                    # Base directory for all saved artefacts
+  model_version: arun-d-enhanced-v1   # Human-readable version tag embedded in
+                                       # checkpoint filenames and experiment logs
