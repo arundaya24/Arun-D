@@ -6,7 +6,7 @@
   "test_loss": 0.4218,
   "test_acc": 0.8588,
   "parameters": 1148874,
-  "train_seconds": 432.6,
+  "train_seconds": 436.8,
   "history": {
     "train_loss": [
       1.727544,
