@@ -6,10 +6,10 @@ import Dashboard from "./pages/Dashboard.jsx";
 import LiquidCanvas from "./components/LiquidCanvas.jsx";
 
 const NAVIGATION_TABS = [
-  { id: "predict", label: "Inferensi", view: Predict },
-  { id: "chat", label: "Chat AI", view: Chat },
+  { id: "predict", label: "Deteksi Gambar", view: Predict },
+  { id: "chat", label: "Tanya AI", view: Chat },
   { id: "history", label: "Riwayat", view: History },
-  { id: "dashboard", label: "Metrik", view: Dashboard },
+  { id: "dashboard", label: "Statistik", view: Dashboard },
 ];
 
 export default function App() {
@@ -23,11 +23,11 @@ export default function App() {
         <header className="masthead">
           <div className="brand-section">
             <div className="brand-identity">
-              <span className="brand-badge">ARUN-D.SYS</span>
+              <span className="brand-badge">AI Vision</span>
               <h1 className="brand-title">Arun-D</h1>
             </div>
             <p className="brand-description">
-              Sistem klasifikasi citra berbasis jaringan saraf tiruan konvolusional dengan telemetri latensi rendah.
+              Asisten cerdas untuk mengenali objek dan orang pada foto, lengkap dengan fitur tanya-jawab dan koreksi label langsung.
             </p>
           </div>
           <nav className="nav-container" aria-label="Navigasi">

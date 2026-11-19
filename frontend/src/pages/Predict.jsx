@@ -46,7 +46,7 @@ export default function Predict() {
     <section className="bento-grid">
       <div className="bento-card">
         <div className="card-header">
-          <span className="card-label">Input Citra</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Upload Foto</span>
           <span className="card-status-dot" />
         </div>
 
@@ -79,7 +79,7 @@ export default function Predict() {
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               </div>
-              <strong className="drop-heading">Tarik dan letakkan berkas</strong>
+              <strong className="drop-heading">Seret foto ke sini atau klik untuk memilih</strong>
               <span className="drop-meta">Format JPG, PNG, WEBP hingga 5 MB</span>
             </div>
           )}
@@ -103,7 +103,7 @@ export default function Predict() {
             className="btn-secondary"
             onClick={() => fileInputRef.current?.click()}
           >
-            {selectedFile ? "Ganti Berkas" : "Pilih Berkas"}
+            {selectedFile ? "Ganti Foto" : "Pilih Foto"}
           </button>
           <button
             type="button"
@@ -111,24 +111,24 @@ export default function Predict() {
             disabled={!selectedFile || isProcessing}
             onClick={executeInference}
           >
-            {isProcessing ? "Memproses Inferensi..." : "Jalankan Klasifikasi"}
+            {isProcessing ? "Menganalisis..." : "Kenali Gambar"}
           </button>
         </div>
       </div>
 
       <div className="bento-card" aria-live="polite">
         <div className="card-header">
-          <span className="card-label">Hasil Telemetri</span>
-          <span className="card-label">10 Kategori Model</span>
+          <span className="card-label">Hasil Deteksi</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Top prediksi</span>
         </div>
 
         {errorMessage && <div className="error-banner">{errorMessage}</div>}
 
         {!errorMessage && !inferenceResult && (
           <div className="empty-state">
-            <h3 className="empty-state-title">Menunggu Data Inferensi</h3>
+            <h3 className="empty-state-title">Belum ada hasil</h3>
             <p className="empty-state-text">
-              Unggah gambar pada area di samping dan jalankan proses klasifikasi untuk melihat distribusi probabilitas model.
+              Upload foto dulu di sebelah kiri, lalu klik "Kenali Gambar" untuk melihat hasil deteksinya.
             </p>
           </div>
         )}
@@ -136,7 +136,7 @@ export default function Predict() {
         {inferenceResult && (
           <div className="verdict-bento">
             <div className="verdict-header-block">
-              <span className="verdict-kicker">Prediksi Utama</span>
+              <span className="verdict-kicker">Terdeteksi sebagai</span>
               <h2 className="verdict-title">{labelOf(inferenceResult.predicted)}</h2>
             </div>
 
@@ -146,7 +146,7 @@ export default function Predict() {
                 <span className="metric-val">{pct(inferenceResult.confidence)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Durasi Komputasi</span>
+                <span className="metric-label">Waktu proses</span>
                 <span className="metric-val">{inferenceResult.inference_ms} ms</span>
               </div>
             </div>
@@ -167,8 +167,8 @@ export default function Predict() {
             </ul>
 
             <div className="telemetry-row">
-              <span>Arsitektur Model: {inferenceResult.model_version}</span>
-              <span>Status: Selesai</span>
+              <span>Model: {inferenceResult.model_version}</span>
+              <span style={{ color: "var(--status-success)", fontWeight: 600 }}>Selesai</span>
             </div>
           </div>
         )}

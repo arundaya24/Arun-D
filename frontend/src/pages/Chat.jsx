@@ -52,9 +52,9 @@ let _id = 0;
 const uid = () => `msg-${++_id}-${Date.now()}`;
 
 function confidenceColor(conf) {
-  if (conf >= 0.8) return "#4ade80";
-  if (conf >= 0.6) return "#e59344";
-  return "#f87171";
+  if (conf >= 0.8) return "#059669";
+  if (conf >= 0.6) return "#d97706";
+  return "#e11d48";
 }
 
 /* ─────────────────────────── Prediction Card ─────────────────────────── */
@@ -79,32 +79,33 @@ function PredictionCard({ prediction, onFeedback, feedbackState }) {
     <div className="card-telemetry-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", color: "var(--text-tertiary)", textTransform: "uppercase" }}>
-            Hasil Klasifikasi
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", color: "var(--text-tertiary)", textTransform: "uppercase" }}>
+            Terdeteksi sebagai
           </div>
-          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--text-primary)", marginTop: 2 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)", marginTop: 3 }}>
             {labelOf(predicted)}
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {is_human && <span className="pill-human-tag">Subjek: Manusia</span>}
+          {is_human && <span className="pill-human-tag">Manusia</span>}
           <span className="pill-engine-tag">{engine_used || "Dual-Engine"}</span>
         </div>
       </div>
 
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontFamily: "var(--font-mono)", fontSize: 11 }}>
-          <span style={{ color: "var(--text-tertiary)" }}>Confidence Score</span>
-          <span style={{ color, fontWeight: 600 }}>{pct(confidence)}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12, fontWeight: 500 }}>
+          <span style={{ color: "var(--text-tertiary)" }}>Tingkat keyakinan</span>
+          <span style={{ color, fontWeight: 700 }}>{pct(confidence)}</span>
         </div>
-        <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+        <div style={{ height: 6, borderRadius: 999, background: "var(--bg-subtle)", overflow: "hidden" }}>
           <div
             style={{
               width: `${widthPct}%`,
               height: "100%",
               background: color,
-              transition: "width 0.4s var(--ease-smooth)",
+              borderRadius: 999,
+              transition: "width 0.5s var(--ease-smooth)",
             }}
           />
         </div>
@@ -116,32 +117,32 @@ function PredictionCard({ prediction, onFeedback, feedbackState }) {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "8px 10px",
-            borderRadius: 4,
-            border: "1px solid rgba(229, 147, 68, 0.35)",
-            background: "var(--accent-tint)",
+            padding: "10px 14px",
+            borderRadius: 12,
+            border: "1px solid var(--accent-amber-border)",
+            background: "var(--accent-amber-tint)",
             color: "var(--accent-amber)",
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
+            fontSize: 12,
+            fontWeight: 500,
           }}
         >
           <IconAlert />
-          <span>Status: Tingkat keyakinan rendah (&lt; 60%). Butuh verifikasi pengguna.</span>
+          <span>Keyakinan model di bawah 60%, tolong verifikasi hasilnya ya.</span>
         </div>
       )}
 
       {top_k.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Distribusi Top Kategori
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Kandidat teratas
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {top_k.slice(0, 3).map((item, idx) => (
-              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
-                <span style={{ color: "var(--text-secondary)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                <span style={{ color: idx === 0 ? "var(--text-primary)" : "var(--text-secondary)", fontWeight: idx === 0 ? 600 : 400, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {labelOf(item.label)}
                 </span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: idx === 0 ? "var(--accent-primary)" : "var(--text-tertiary)", fontWeight: 600 }}>
                   {pct(item.score)}
                 </span>
               </div>
@@ -150,13 +151,13 @@ function PredictionCard({ prediction, onFeedback, feedbackState }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-hairline)", paddingTop: 10, marginTop: 4 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>
-          Latensi: {inference_ms || 0} ms
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-hairline)", paddingTop: 12, marginTop: 2 }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
+          {inference_ms || 0} ms
         </span>
 
         {!fs.submitted ? (
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
               className="btn-tactile btn-tactile-confirm"
@@ -173,37 +174,40 @@ function PredictionCard({ prediction, onFeedback, feedbackState }) {
             </button>
           </div>
         ) : (
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#4ade80" }}>
-            Feedback Tercatat
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--status-success)" }}>
+            Tercatat, terima kasih!
           </span>
         )}
       </div>
 
       {fs.showing && !fs.submitted && (
-        <div style={{ display: "flex", gap: 6, marginTop: 6, paddingTop: 8, borderTop: "1px solid var(--border-hairline)" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 4, paddingTop: 12, borderTop: "1px solid var(--border-hairline)" }}>
           <input
             type="text"
-            placeholder="Label yang benar..."
+            placeholder="Tulis label yang benar..."
             value={fs.labelInput}
             onChange={(e) => onFeedback(prediction_id, predicted, e.target.value, false, true, true)}
             style={{
               flex: 1,
               background: "var(--bg-elevated)",
-              border: "1px solid var(--border-hairline)",
-              borderRadius: 4,
-              padding: "6px 10px",
+              border: "1px solid transparent",
+              borderRadius: 12,
+              padding: "8px 14px",
               color: "var(--text-primary)",
               fontFamily: "var(--font-sans)",
-              fontSize: 12,
+              fontSize: 13,
               outline: "none",
+              transition: "all 0.2s var(--ease-smooth)",
             }}
+            onFocus={(e) => { e.target.style.borderColor = "var(--accent-primary)"; e.target.style.boxShadow = "0 0 0 3px rgba(79,70,229,0.1)"; }}
+            onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.boxShadow = "none"; }}
           />
           <button
             type="button"
             className="btn-shimmer-cta"
             disabled={!fs.labelInput.trim()}
             onClick={() => onFeedback(prediction_id, predicted, fs.labelInput.trim(), false)}
-            style={{ padding: "6px 12px", fontSize: 11 }}
+            style={{ padding: "8px 16px", fontSize: 12, flex: "none" }}
           >
             Simpan
           </button>
@@ -234,7 +238,7 @@ export default function Chat() {
       {
         id: uid(),
         role: "assistant",
-        text: "Sistem inferensi citra aktif. Lampirkan berkas citra untuk menjalankan klasifikasi objek dan deteksi manusia, atau ajukan pertanyaan.",
+        text: "Halo! Kirim foto dan aku akan coba tebak objek atau orang yang ada di dalamnya. Kalau hasilnya kurang tepat, kamu bisa langsung koreksi.",
         prediction: null,
       },
     ]);
@@ -290,7 +294,7 @@ export default function Chat() {
     const userMsg = {
       id: uid(),
       role: "user",
-      text: userText || (currentFile ? `Menganalisis berkas: ${currentFile.name}` : ""),
+      text: userText || (currentFile ? `Foto dikirim: ${currentFile.name}` : ""),
       imageUrl: currentPreview,
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -400,15 +404,15 @@ export default function Chat() {
 
   return (
     <section className="chat-shell">
-      {/* ── Left Column: Chat Terminal ── */}
+      {/* ── Left Column: Chat ── */}
       <div className="bento-card chat-card">
         <div className="chat-header">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span className="card-status-dot" />
-            <span className="card-label">Terminal Inferensi Interaktif</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Tanya AI</span>
           </div>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>
-            PORT: 8000 / DUAL ENGINE
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--status-success)", background: "var(--status-success-bg)", border: "1px solid var(--status-success-border)", padding: "3px 10px", borderRadius: "var(--radius-full)" }}>
+            Online
           </span>
         </div>
 
@@ -416,12 +420,12 @@ export default function Chat() {
           {messages.map((msg) => (
             <div key={msg.id} className={`chat-bubble-row ${msg.role}`}>
               <div className="chat-badge-avatar">
-                {msg.role === "user" ? "USR" : "SYS"}
+                {msg.role === "user" ? "Kamu" : "AI"}
               </div>
 
               <div className="chat-bubble-content">
                 {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="Lampiran input" className="chat-image-preview" />
+                  <img src={msg.imageUrl} alt="Foto yang dikirim" className="chat-image-preview" />
                 )}
                 <div>{msg.text}</div>
 
@@ -438,8 +442,8 @@ export default function Chat() {
 
           {isLoading && (
             <div className="chat-bubble-row assistant">
-              <div className="chat-badge-avatar">SYS</div>
-              <div className="chat-bubble-content" style={{ padding: "8px 14px" }}>
+              <div className="chat-badge-avatar">AI</div>
+              <div className="chat-bubble-content" style={{ padding: "14px 20px" }}>
                 <div className="pulse-loader">
                   <span className="pulse-dot" />
                   <span className="pulse-dot" />
@@ -483,7 +487,7 @@ export default function Chat() {
               type="button"
               className="btn-icon-tactile"
               onClick={() => fileInputRef.current?.click()}
-              title="Lampirkan berkas citra"
+              title="Lampirkan foto"
             >
               <IconCamera />
             </button>
@@ -491,7 +495,7 @@ export default function Chat() {
             <textarea
               className="chat-textarea"
               rows={1}
-              placeholder="Ketik instruksi atau lampirkan citra..."
+              placeholder="Tanya sesuatu, atau kirim foto..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
@@ -507,8 +511,8 @@ export default function Chat() {
               className="btn-shimmer-cta"
               disabled={isLoading || (!inputText.trim() && !selectedFile)}
               onClick={sendMessage}
-              style={{ flex: "none", width: 42, height: 42, padding: 0 }}
-              title="Kirim pesan"
+              style={{ flex: "none", width: 44, height: 44, padding: 0 }}
+              title="Kirim"
             >
               <IconSend />
             </button>
@@ -516,56 +520,50 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* ── Right Column: Telemetry & Active Learning Sidebar ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="bento-card" style={{ padding: 20 }}>
+      {/* ── Right Column: Sidebar ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="bento-card" style={{ padding: 24, gap: 16 }}>
           <div className="card-header">
-            <span className="card-label">Konfigurasi Model</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#4ade80" }}>ONLINE</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Info Model</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--status-success)", background: "var(--status-success-bg)", border: "1px solid var(--status-success-border)", padding: "2px 8px", borderRadius: "var(--radius-full)" }}>Aktif</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>Primary Engine</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>MobileNetV3</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>Fallback Engine</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>Arun-D CNN</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>Deteksi Manusia</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-amber)" }}>TERPASANG</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>Total Kategori</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>1.000+ Kelas</span>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 4 }}>
+            {[
+              { label: "Engine Utama", val: "MobileNetV3" },
+              { label: "Fallback", val: "Arun-D CNN" },
+              { label: "Deteksi Manusia", val: "Aktif" },
+              { label: "Jumlah Kategori", val: "1.000+ kelas" },
+            ].map(({ label, val }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>{label}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{val}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="bento-card" style={{ padding: 20 }}>
+        <div className="bento-card" style={{ padding: 24, gap: 16 }}>
           <div className="card-header">
-            <span className="card-label">Active Learning Buffer</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>RETRAIN PIPELINE</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Latih Ulang Model</span>
           </div>
 
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 4 }}>
-            Setiap koreksi yang Anda masukkan akan disimpan ke dataset lokal untuk melatih ulang head klasifikasi tanpa merusak bobot model utama.
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65 }}>
+            Setiap koreksi yang kamu berikan akan disimpan dan dipakai untuk melatih ulang model supaya makin pintar.
           </p>
 
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 4 }}>
             <button
               type="button"
               className="btn-secondary"
               onClick={handleRetrainTrigger}
               disabled={retrainStatus.status === "running"}
-              style={{ width: "100%", fontSize: 11, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}
+              style={{ width: "100%", fontSize: 13, fontWeight: 600 }}
             >
-              {retrainStatus.status === "running" ? "MEMPROSES RETRAINING..." : "JALANKAN FINE-TUNING"}
+              {retrainStatus.status === "running" ? "Sedang memproses..." : "Jalankan Fine-Tuning"}
             </button>
             {retrainStatus.message && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", marginTop: 8, lineHeight: 1.4 }}>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.55 }}>
                 {retrainStatus.message}
               </div>
             )}

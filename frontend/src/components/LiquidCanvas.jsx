@@ -98,16 +98,16 @@ export default function LiquidCanvas() {
         vec3 halfDir = normalize(studioLightDir + viewDir);
         float specular = pow(max(dot(normal, halfDir), 0.0), 32.0) * 0.45;
 
-        vec3 baseObsidian = vec3(0.035, 0.038, 0.045);
-        vec3 rimGraphite = vec3(0.22, 0.25, 0.30);
-        vec3 warmSpecular = vec3(0.92, 0.70, 0.45);
+        vec3 basePearl = vec3(0.94, 0.96, 0.98);
+        vec3 rimSoft = vec3(0.85, 0.90, 0.96);
+        vec3 warmSpecular = vec3(0.99, 0.88, 0.76);
 
-        vec3 finalColor = baseObsidian + (rimGraphite * fresnel * 0.75) + (diffuse * 0.08) + (warmSpecular * specular);
+        vec3 finalColor = basePearl + (rimSoft * fresnel * 0.45) + (diffuse * 0.05) + (warmSpecular * specular * 0.35);
 
         float edgeFade = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x) *
                          smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.65, vUv.y);
 
-        float alpha = clamp(edgeFade * (0.35 + fresnel * 0.3), 0.0, 0.75);
+        float alpha = clamp(edgeFade * (0.28 + fresnel * 0.22), 0.0, 0.55);
 
         gl_FragColor = vec4(finalColor, alpha);
       }

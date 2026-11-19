@@ -13,9 +13,9 @@ import {
 } from "recharts";
 import { api, labelOf, pct } from "../api.js";
 
-const GRAPHITE = "#94a3b8";
-const AMBER = "#e59344";
-const SUBTLE_GRID = "rgba(255, 255, 255, 0.08)";
+const GRAPHITE = "#64748b";
+const AMBER = "#4f46e5";
+const SUBTLE_GRID = "rgba(100, 116, 139, 0.12)";
 
 function StatItem({ title, value }) {
   return (
@@ -65,36 +65,38 @@ export default function Dashboard() {
   return (
     <section className="dashboard-container">
       <div className="section-title-wrap">
-        <h2 className="section-title">Metrik Penggunaan Sistem</h2>
+        <h2 className="section-title">Statistik Penggunaan</h2>
       </div>
 
       <div className="dashboard-stat-grid">
-        <StatItem title="Total Permintaan" value={stats.total_predictions} />
+        <StatItem title="Total Prediksi" value={stats.total_predictions} />
         <StatItem title="Rata-rata Keyakinan" value={pct(stats.avg_confidence)} />
         <StatItem title="Latensi Rata-rata" value={`${stats.avg_inference_ms} ms`} />
       </div>
 
       <div className="charts-asymmetric">
         <div className="chart-card">
-          <span className="chart-title">Distribusi Kategori Inferensi</span>
+          <span className="chart-title">Distribusi Kategori</span>
           {stats.by_class.length === 0 ? (
-            <p className="cell-mono" style={{ color: "var(--text-tertiary)" }}>Belum ada data rekaman.</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Belum ada data rekaman.</p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={stats.by_class.map((c) => ({ ...c, name: labelOf(c.label) }))}>
                 <CartesianGrid stroke={SUBTLE_GRID} vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#15181f",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "4px",
-                    fontFamily: "var(--font-mono)",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    fontFamily: "var(--font-sans)",
                     fontSize: "12px",
+                    boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
+                    color: "#1e293b",
                   }}
                 />
-                <Bar dataKey="count" name="Jumlah" fill={AMBER} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="count" name="Jumlah" fill={AMBER} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -103,23 +105,25 @@ export default function Dashboard() {
         <div className="chart-card">
           <span className="chart-title">Aktivitas Harian (14 Hari)</span>
           {stats.daily.length === 0 ? (
-            <p className="cell-mono" style={{ color: "var(--text-tertiary)" }}>Belum ada data rekaman.</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Belum ada data rekaman.</p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={stats.daily}>
                 <CartesianGrid stroke={SUBTLE_GRID} vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#15181f",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "4px",
-                    fontFamily: "var(--font-mono)",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    fontFamily: "var(--font-sans)",
                     fontSize: "12px",
+                    boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
+                    color: "#1e293b",
                   }}
                 />
-                <Bar dataKey="count" name="Inferensi" fill={GRAPHITE} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="count" name="Inferensi" fill={GRAPHITE} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -127,12 +131,12 @@ export default function Dashboard() {
       </div>
 
       <div className="section-title-wrap">
-        <h2 className="section-title">Kinerja dan Parameter Model</h2>
+        <h2 className="section-title">Kinerja Model</h2>
       </div>
 
       {isModelMissing && (
         <div className="stat-card">
-          <p className="cell-mono" style={{ color: "var(--text-secondary)" }}>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
             Model belum dimuat atau belum dilatih. Jalankan perintah latihan model di backend untuk menampilkan metrik.
           </p>
         </div>
@@ -149,53 +153,57 @@ export default function Dashboard() {
 
           <div className="charts-asymmetric">
             <div className="chart-card">
-              <span className="chart-title">Kurva Konvergensi Loss</span>
+              <span className="chart-title">Kurva Loss (Training vs Validasi)</span>
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={trainingCurves}>
                   <CartesianGrid stroke={SUBTLE_GRID} vertical={false} />
-                  <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
-                  <YAxis tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
+                  <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
+                  <YAxis tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#15181f",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      borderRadius: "4px",
-                      fontFamily: "var(--font-mono)",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "12px",
+                      fontFamily: "var(--font-sans)",
                       fontSize: "12px",
+                      boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
+                      color: "#1e293b",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "11px", fontFamily: "var(--font-mono)" }} />
-                  <Line dataKey="train_loss" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={1.5} />
-                  <Line dataKey="val_loss" name="Validasi" stroke={AMBER} dot={false} strokeWidth={1.5} />
+                  <Legend wrapperStyle={{ fontSize: "12px", fontFamily: "var(--font-sans)" }} />
+                  <Line dataKey="train_loss" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={2} />
+                  <Line dataKey="val_loss" name="Validasi" stroke={AMBER} dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
             <div className="chart-card">
-              <span className="chart-title">Kurva Konvergensi Akurasi</span>
+              <span className="chart-title">Kurva Akurasi</span>
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={trainingCurves}>
                   <CartesianGrid stroke={SUBTLE_GRID} vertical={false} />
-                  <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: GRAPHITE }} stroke={SUBTLE_GRID} />
+                  <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                   <YAxis
                     domain={[0, 1]}
                     tick={{ fontSize: 11, fill: GRAPHITE }}
-                    stroke={SUBTLE_GRID}
+                    stroke="transparent"
                     tickFormatter={(val) => `${Math.round(val * 100)}%`}
                   />
                   <Tooltip
                     formatter={(val) => pct(val)}
                     contentStyle={{
-                      backgroundColor: "#15181f",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      borderRadius: "4px",
-                      fontFamily: "var(--font-mono)",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "12px",
+                      fontFamily: "var(--font-sans)",
                       fontSize: "12px",
+                      boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
+                      color: "#1e293b",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "11px", fontFamily: "var(--font-mono)" }} />
-                  <Line dataKey="train_acc" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={1.5} />
-                  <Line dataKey="val_acc" name="Validasi" stroke={AMBER} dot={false} strokeWidth={1.5} />
+                  <Legend wrapperStyle={{ fontSize: "12px", fontFamily: "var(--font-sans)" }} />
+                  <Line dataKey="train_acc" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={2} />
+                  <Line dataKey="val_acc" name="Validasi" stroke={AMBER} dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -203,7 +211,7 @@ export default function Dashboard() {
 
           {metrics?.per_class && (
             <div className="chart-card">
-              <span className="chart-title">Evaluasi Kategori Uji</span>
+              <span className="chart-title">Evaluasi Per Kategori</span>
               <div className="data-table-shell">
                 <table className="data-table">
                   <thead>
