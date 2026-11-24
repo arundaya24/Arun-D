@@ -15,12 +15,15 @@ const NAVIGATION_TABS = [
 export default function App() {
   const [activeTab, setActiveTab] = useState("predict");
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("arun_d_theme") || "dark";
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
   });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("arun_d_theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    try {
+      localStorage.setItem("arun_d_theme", theme);
+    } catch {}
   }, [theme]);
 
   const toggleTheme = () => {

@@ -13,9 +13,9 @@ import {
 } from "recharts";
 import { api, labelOf, pct } from "../api.js";
 
-const GRAPHITE = "#64748b";
-const AMBER = "#4f46e5";
-const SUBTLE_GRID = "rgba(100, 116, 139, 0.12)";
+const GRAPHITE = "var(--text-tertiary)";
+const ACCENT = "var(--accent-primary)";
+const SUBTLE_GRID = "var(--border-hairline)";
 
 function StatItem({ title, value }) {
   return (
@@ -87,16 +87,16 @@ export default function Dashboard() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e2e8f0",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-hairline)",
                     borderRadius: "12px",
                     fontFamily: "var(--font-sans)",
                     fontSize: "12px",
-                    boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
-                    color: "#1e293b",
+                    boxShadow: "var(--shadow-card)",
+                    color: "var(--text-primary)",
                   }}
                 />
-                <Bar dataKey="count" name="Jumlah" fill={AMBER} radius={[6, 6, 0, 0]} />
+                <Bar dataKey="count" name="Jumlah" fill={ACCENT} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -114,13 +114,13 @@ export default function Dashboard() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e2e8f0",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-hairline)",
                     borderRadius: "12px",
                     fontFamily: "var(--font-sans)",
                     fontSize: "12px",
-                    boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
-                    color: "#1e293b",
+                    boxShadow: "var(--shadow-card)",
+                    color: "var(--text-primary)",
                   }}
                 />
                 <Bar dataKey="count" name="Inferensi" fill={GRAPHITE} radius={[6, 6, 0, 0]} />
@@ -161,18 +161,18 @@ export default function Dashboard() {
                   <YAxis tick={{ fontSize: 11, fill: GRAPHITE }} stroke="transparent" />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e2e8f0",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-hairline)",
                       borderRadius: "12px",
                       fontFamily: "var(--font-sans)",
                       fontSize: "12px",
-                      boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
-                      color: "#1e293b",
+                      boxShadow: "var(--shadow-card)",
+                      color: "var(--text-primary)",
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: "12px", fontFamily: "var(--font-sans)" }} />
                   <Line dataKey="train_loss" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={2} />
-                  <Line dataKey="val_loss" name="Validasi" stroke={AMBER} dot={false} strokeWidth={2} />
+                  <Line dataKey="val_loss" name="Validasi" stroke={ACCENT} dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -192,18 +192,18 @@ export default function Dashboard() {
                   <Tooltip
                     formatter={(val) => pct(val)}
                     contentStyle={{
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e2e8f0",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-hairline)",
                       borderRadius: "12px",
                       fontFamily: "var(--font-sans)",
                       fontSize: "12px",
-                      boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
-                      color: "#1e293b",
+                      boxShadow: "var(--shadow-card)",
+                      color: "var(--text-primary)",
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: "12px", fontFamily: "var(--font-sans)" }} />
                   <Line dataKey="train_acc" name="Training" stroke={GRAPHITE} dot={false} strokeWidth={2} />
-                  <Line dataKey="val_acc" name="Validasi" stroke={AMBER} dot={false} strokeWidth={2} />
+                  <Line dataKey="val_acc" name="Validasi" stroke={ACCENT} dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

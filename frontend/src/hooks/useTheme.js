@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-const STORAGE_KEY = "theme";
+const STORAGE_KEY = "arun_d_theme";
 
 function getInitialTheme() {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";

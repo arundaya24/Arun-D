@@ -10,7 +10,7 @@
 2. FastAPI memvalidasi tipe dan ukuran file.
 3. OpenCV men-decode bytes menjadi gambar RGB.
 4. Transform evaluasi (resize 32×32, normalisasi) **identik dengan validation/test**.
-5. Forward pass menghasilkan logits → softmax → top-3.
+5. Model memprediksi gambar asli dan flip horizontal; probabilitas keduanya dirata-ratakan sebelum top-3 dipilih.
 6. Hasil disimpan ke tabel `predictions`, lalu dikembalikan sebagai JSON.
 
 ## Keputusan desain

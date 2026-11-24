@@ -14,14 +14,9 @@
       (function () {
         var stored = null;
         try {
-          stored = localStorage.getItem("theme");
+          stored = localStorage.getItem("arun_d_theme");
         } catch (e) {}
-        var theme =
-          stored === "light" || stored === "dark"
-            ? stored
-            : window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light";
+        var theme = stored === "light" || stored === "dark" ? stored : "dark";
         document.documentElement.dataset.theme = theme;
         document.documentElement.style.colorScheme = theme;
       })();

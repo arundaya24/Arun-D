@@ -336,7 +336,7 @@ body {
 .drop-viewport.has-preview {
   border-style: solid;
   border-color: var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-surface);
   padding: 16px;
 }
 
@@ -361,7 +361,7 @@ body {
   height: 52px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-elevated);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -813,7 +813,7 @@ body {
 }
 
 .btn-paginate {
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-full);
   padding: 7px 16px;
@@ -921,7 +921,7 @@ body {
   padding: 6px 10px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-surface);
   color: var(--text-secondary);
   height: fit-content;
   flex-shrink: 0;
@@ -938,7 +938,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1px solid var(--border-hairline);
   border-radius: 20px;
   border-top-left-radius: 4px;
@@ -971,7 +971,7 @@ body {
 .chat-input-bar {
   padding: 16px 20px;
   border-top: 1px solid var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1043,7 +1043,7 @@ body {
 }
 
 .chat-textarea:focus {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
@@ -1083,7 +1083,7 @@ body {
   font-weight: 600;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -1147,7 +1147,7 @@ body {
   padding: 3px 10px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-hairline);
-  background: #ffffff;
+  background: var(--bg-surface);
   color: var(--text-tertiary);
   box-shadow: var(--shadow-sm);
 }

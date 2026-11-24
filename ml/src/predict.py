@@ -52,6 +52,16 @@ class Predictor:
         self._hybrid_transform = None
         self._init_hybrid_engine()
 
+    @staticmethod
+    def _tta_probabilities(model: torch.nn.Module, x: torch.Tensor) -> torch.Tensor:
+        """Rata-ratakan probabilitas gambar asli dan flip horizontal."""
+        batch = torch.cat((x, torch.flip(x, dims=(-1,))), dim=0)
+        original_logits, flipped_logits = model(batch).chunk(2)
+        return (
+            torch.softmax(original_logits, dim=1)
+            + torch.softmax(flipped_logits, dim=1)
+        ) / 2
+
     def _init_hybrid_engine(self) -> None:
         """Mencoba memuat MobileNetV3-Small dari cache lokal jika file bobot telah selesai diunduh."""
         cache_file = Path.home() / ".cache" / "torch" / "hub" / "checkpoints" / "mobilenet_v3_small-047dcff4.pth"
@@ -146,7 +156,7 @@ class Predictor:
     def predict(self, image: Image.Image, top_k: int = 3) -> dict:
         t0 = time.perf_counter()
         x = self.transform(image).unsqueeze(0).to(self.device)
-        probs = torch.softmax(self.model(x), dim=1)[0]
+        probs = self._tta_probabilities(self.model, x)[0]
         k = min(top_k, len(self.classes))
         scores, idx = probs.topk(k)
         top = [
@@ -174,7 +184,7 @@ class Predictor:
 
         t0 = time.perf_counter()
         x = self._hybrid_transform(image).unsqueeze(0).to(self.device)
-        probs = torch.softmax(self._hybrid_model(x), dim=1)[0]
+        probs = self._tta_probabilities(self._hybrid_model, x)[0]
         k = min(top_k, len(self._hybrid_classes))
         scores, idx = probs.topk(k)
         top = [
@@ -217,14 +227,7 @@ class Predictor:
             elif a_top in ("horse", "frog", "deer", "cat", "dog", "bird") and a_conf >= 0.60:
                 base_result = a_res
             else:
-                # 3. MobileNetV3 pada 1.000 kelas ImageNet
-                top2_conf = h_res["top_k"][1]["score"] if len(h_res["top_k"]) > 1 else 0.0
-                margin = max(0.0, h_conf - top2_conf)
-                calibrated_conf = min(0.98, max(h_conf, round(0.40 + h_conf * 0.50 + margin * 0.4, 4)))
-                h_res["confidence"] = calibrated_conf
-                h_res["top_k"][0]["score"] = calibrated_conf
-                h_res["is_uncertain"] = calibrated_conf < 0.50
-                h_res["is_low_confidence"] = h_res["is_uncertain"]
+                # Gunakan skor model apa adanya; menaikkan confidence tidak meningkatkan akurasi.
                 base_result = h_res
         else:
             base_result = a_res
