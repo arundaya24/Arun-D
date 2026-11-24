@@ -236,7 +236,7 @@ def _run_retraining_task():
         res = fine_tune_from_corrections(
             corrections_dir="ml/data/corrections",
             artifacts_dir="ml/artifacts",
-            epochs=5,
+            epochs=20,
         )
         try:
             from backend.app.services.inference import reload_predictor

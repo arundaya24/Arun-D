@@ -250,8 +250,82 @@ export const LABEL_ID = {
   starfish: "Bintang Laut",
   sea_urchin: "Landak Laut",
   sea_cucumber: "Teripang",
+
+  // Kategori Objek & Lingkungan Populer
+  alp: "Pegunungan Salju / Gunung",
+  volcano: "Gunung Berapi",
+  promontory: "Tanjung Tebing",
+  valley: "Lembah Pegunungan",
+  lakeside: "Tepi Danau",
+  seashore: "Pesisir Pantai",
+
+  "passenger car": "Kereta Penumpang / Gerbong",
+  passenger_car: "Kereta Penumpang / Gerbong",
+  "electric locomotive": "Lokomotif / Kereta Listrik",
+  electric_locomotive: "Lokomotif / Kereta Listrik",
+  steam_locomotive: "Lokomotif Uap",
+  streetcar: "Trem Listrik",
+
+  "folding chair": "Kursi Lipat",
+  folding_chair: "Kursi Lipat",
+  "rocking chair": "Kursi Goyang",
+  rocking_chair: "Kursi Goyang",
+  pedestal: "Meja Tumpuan",
+  "dining table": "Meja Makan",
+  dining_table: "Meja Makan",
+
+  bookshop: "Toko Buku",
+  bookstore: "Toko Buku",
+  library: "Perpustakaan",
+  bookcase: "Rak Buku",
+
+  "brain coral": "Koral Otak",
+  brain_coral: "Koral Otak",
+
+  spatula: "Spatula / Sekop Dapur",
+  loudspeaker: "Speaker / Pengeras Suara",
+  "cellular telephone": "Ponsel / Handphone",
+  cellular_telephone: "Ponsel / Handphone",
+  laptop: "Laptop Komputer",
+  monitor: "Layar Monitor",
+
+  quill: "Bulu Unggas / Pena Bulu",
+  "jigsaw puzzle": "Puzzle Gambar",
+  jigsaw_puzzle: "Puzzle Gambar",
+  "prayer rug": "Sajadah / Karpet",
+  prayer_rug: "Sajadah / Karpet",
+  velvet: "Kain Beludru",
+
+  "Great Dane": "Anjing Great Dane",
+  great_dane: "Anjing Great Dane",
+  tabby: "Kucing Belang (Tabby)",
+  "Persian cat": "Kucing Persia / Anggora",
+  persian_cat: "Kucing Persia / Anggora",
+  "Siamese cat": "Kucing Siam",
+  siamese_cat: "Kucing Siam",
+  "Egyptian cat": "Kucing Mesir",
+  egyptian_cat: "Kucing Mesir",
+
+  "military uniform": "Seragam Militer",
+  military_uniform: "Seragam Militer",
+  "lab coat": "Jas Laboratorium",
+  lab_coat: "Jas Laboratorium",
+  television: "Televisi",
 };
 
-export const labelOf = (l) => LABEL_ID[l] || l;
+export const labelOf = (l) => {
+  if (!l) return "";
+  const key = String(l).trim();
+  const lower = key.toLowerCase();
+  const underscore = lower.replace(/[\s-]+/g, "_");
+  const space = lower.replace(/_+/g, " ");
+  return (
+    LABEL_ID[key] ||
+    LABEL_ID[lower] ||
+    LABEL_ID[space] ||
+    LABEL_ID[underscore] ||
+    key
+  );
+};
 
 export const pct = (v) => `${(v * 100).toFixed(1)}%`;

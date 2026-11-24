@@ -1,8 +1,15 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-export default function LiquidCanvas() {
+export default function LiquidCanvas({ theme = "dark" }) {
   const mountRef = useRef(null);
+  const materialRef = useRef(null);
+
+  useEffect(() => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uIsDark.value = theme === "dark" ? 1.0 : 0.0;
+    }
+  }, [theme]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -36,6 +43,7 @@ export default function LiquidCanvas() {
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
       uScroll: { value: 0 },
+      uIsDark: { value: theme === "dark" ? 1.0 : 0.0 },
     };
 
     const vertexShader = `
@@ -85,6 +93,7 @@ export default function LiquidCanvas() {
       varying float vElevation;
 
       uniform vec2 uMouse;
+      uniform float uIsDark;
 
       void main() {
         vec3 normal = normalize(vNormal);
@@ -98,16 +107,26 @@ export default function LiquidCanvas() {
         vec3 halfDir = normalize(studioLightDir + viewDir);
         float specular = pow(max(dot(normal, halfDir), 0.0), 32.0) * 0.45;
 
+        // Dark obsidian mode (asli)
+        vec3 baseObsidian = vec3(0.035, 0.038, 0.045);
+        vec3 rimGraphite = vec3(0.22, 0.25, 0.30);
+        vec3 warmSpecular = vec3(0.92, 0.70, 0.45);
+        vec3 darkColor = baseObsidian + (rimGraphite * fresnel * 0.75) + (diffuse * 0.08) + (warmSpecular * specular);
+
+        // Light pearl mode
         vec3 basePearl = vec3(0.94, 0.96, 0.98);
         vec3 rimSoft = vec3(0.85, 0.90, 0.96);
-        vec3 warmSpecular = vec3(0.99, 0.88, 0.76);
+        vec3 lightSpecular = vec3(0.99, 0.88, 0.76);
+        vec3 lightColor = basePearl + (rimSoft * fresnel * 0.45) + (diffuse * 0.05) + (lightSpecular * specular * 0.35);
 
-        vec3 finalColor = basePearl + (rimSoft * fresnel * 0.45) + (diffuse * 0.05) + (warmSpecular * specular * 0.35);
+        vec3 finalColor = mix(lightColor, darkColor, uIsDark);
 
         float edgeFade = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x) *
                          smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.65, vUv.y);
 
-        float alpha = clamp(edgeFade * (0.28 + fresnel * 0.22), 0.0, 0.55);
+        float alphaDark = clamp(edgeFade * (0.35 + fresnel * 0.3), 0.0, 0.75);
+        float alphaLight = clamp(edgeFade * (0.28 + fresnel * 0.22), 0.0, 0.55);
+        float alpha = mix(alphaLight, alphaDark, uIsDark);
 
         gl_FragColor = vec4(finalColor, alpha);
       }
@@ -121,6 +140,7 @@ export default function LiquidCanvas() {
       depthWrite: false,
       side: THREE.DoubleSide,
     });
+    materialRef.current = material;
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI * 0.32;

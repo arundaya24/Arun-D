@@ -70,8 +70,8 @@ class CorrectionDataset(Dataset):
 def fine_tune_from_corrections(
     corrections_dir: Union[str, Path] = "ml/data/corrections",
     artifacts_dir: Union[str, Path] = "ml/artifacts",
-    epochs: int = 5,
-    lr: float = 1e-4,
+    epochs: int = 20,
+    lr: float = 1e-3,
     device: Optional[str] = None,
 ) -> dict:
     """Melatih ulang model secara aman (freeze feature layers, latih classification head)
