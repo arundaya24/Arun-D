@@ -23,7 +23,8 @@ HUMAN_RELATED_LABELS = {
     "military uniform", "cloak", "jean", "sweatshirt", "bikini",
     "lab coat", "mortarboard", "poncho", "stole", "tights", "breastplate",
     "pajamas", "cardigan", "miniskirt", "hoopskirt", "overskirt",
-    "person", "human", "man", "woman"
+    "person", "human", "man", "woman", "cowboy hat", "bonnet",
+    "life jacket", "space suit", "ski mask", "baseball player"
 }
 
 
@@ -69,8 +70,7 @@ class Predictor:
                         self._hybrid_classes = json.load(f)
 
                     self._hybrid_transform = T.Compose([
-                        T.Resize(256),
-                        T.CenterCrop(224),
+                        T.Resize((224, 224), interpolation=T.InterpolationMode.BILINEAR),
                         T.ToTensor(),
                         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                     ])
@@ -83,15 +83,24 @@ class Predictor:
         return self._hybrid_model is not None
 
     @staticmethod
-    def detect_human(image: Image.Image, top_preds: list[dict]) -> Tuple[bool, float, Optional[str]]:
+    def detect_human(image: Image.Image, top_preds: list[dict], custom_preds: list[dict] = None) -> Tuple[bool, float, Optional[str]]:
         """Mendeteksi apakah subjek dalam citra adalah manusia berdasarkan
-
-        kombinasi segmentasi warna kulit (YCrCb) dan klasifikasi kelas pakaian/atribut manusia.
+        kombinasi atribut manusia, pakaian, kelas custom, dan warna kulit.
         """
         human_matches = [
             item for item in top_preds
             if item["label"].lower().strip() in HUMAN_RELATED_LABELS
         ]
+
+        if human_matches:
+            match_score = human_matches[0]["score"]
+            human_conf = min(0.98, max(match_score, 0.65 + match_score * 0.35))
+            return True, round(human_conf, 4), human_matches[0]["label"]
+
+        if custom_preds:
+            for item in custom_preds:
+                if item["label"].lower().strip() in ("manusia", "human") and item["score"] >= 0.25:
+                    return True, round(max(item["score"], 0.70), 4), "manusia"
 
         skin_ratio = 0.0
         try:
@@ -105,13 +114,18 @@ class Predictor:
         except Exception:
             skin_ratio = 0.0
 
-        if human_matches:
-            match_score = human_matches[0]["score"]
-            human_conf = min(0.98, max(match_score, 0.55 + skin_ratio * 0.7))
-            return True, round(human_conf, 4), human_matches[0]["label"]
+        non_human_strong = False
+        if top_preds:
+            top_label = top_preds[0]["label"].lower()
+            animal_landscape_indicators = (
+                "dog", "cat", "horse", "bird", "frog", "deer", "alp", "mountain", "valley",
+                "volcano", "tree", "plant", "car", "locomotive", "airplane", "ship", "truck"
+            )
+            if any(ind in top_label for ind in animal_landscape_indicators) and top_preds[0]["score"] >= 0.20:
+                non_human_strong = True
 
-        if skin_ratio >= 0.14:
-            human_conf = min(0.92, 0.45 + skin_ratio * 0.85)
+        if skin_ratio >= 0.25 and not non_human_strong:
+            human_conf = min(0.85, 0.45 + skin_ratio * 0.7)
             return True, round(human_conf, 4), None
 
         return False, 0.0, None
@@ -186,27 +200,44 @@ class Predictor:
 
     def predict_bytes(self, data: bytes, top_k: int = 3) -> dict:
         img = self.decode(data)
-        if self.has_hybrid:
-            h_res = self.predict_hybrid(img, top_k)
-            if h_res["confidence"] >= 0.60:
-                base_result = h_res
-            else:
-                a_res = self.predict(img, top_k)
-                base_result = a_res if a_res["confidence"] >= h_res["confidence"] else h_res
-        else:
-            base_result = self.predict(img, top_k)
+        a_res = self.predict(img, top_k=top_k)
 
-        is_human, human_conf, subtype = self.detect_human(img, base_result.get("top_k", []))
+        if self.has_hybrid:
+            h_res = self.predict_hybrid(img, top_k=top_k)
+            custom_classes = set(self.classes[10:]) if len(self.classes) > 10 else set()
+            a_top = a_res["predicted"]
+            a_conf = a_res["confidence"]
+            h_top = h_res["predicted"]
+            h_conf = h_res["confidence"]
+
+            # 1. Jika Arun-D mendeteksi kelas koreksi custom dengan keyakinan cukup
+            if a_top in custom_classes and a_conf >= 0.18:
+                base_result = a_res
+            # 2. Jika Arun-D mendeteksi kelas hewan/objek kuat (misal horse > 0.60)
+            elif a_top in ("horse", "frog", "deer", "cat", "dog", "bird") and a_conf >= 0.60:
+                base_result = a_res
+            else:
+                # 3. MobileNetV3 pada 1.000 kelas ImageNet
+                top2_conf = h_res["top_k"][1]["score"] if len(h_res["top_k"]) > 1 else 0.0
+                margin = max(0.0, h_conf - top2_conf)
+                calibrated_conf = min(0.98, max(h_conf, round(0.40 + h_conf * 0.50 + margin * 0.4, 4)))
+                h_res["confidence"] = calibrated_conf
+                h_res["top_k"][0]["score"] = calibrated_conf
+                h_res["is_uncertain"] = calibrated_conf < 0.50
+                h_res["is_low_confidence"] = h_res["is_uncertain"]
+                base_result = h_res
+        else:
+            base_result = a_res
+
+        is_human, human_conf, subtype = self.detect_human(img, base_result.get("top_k", []), a_res.get("top_k", []))
         base_result["is_human"] = is_human
 
-        if is_human:
-            if subtype or human_conf >= 0.65 or base_result["confidence"] < 0.60:
-                old_label = base_result["predicted"]
-                base_result["predicted"] = "human"
-                base_result["confidence"] = max(base_result["confidence"], human_conf)
-                existing = [item for item in base_result.get("top_k", []) if item["label"] != "human"]
-                base_result["top_k"] = [{"label": "human", "score": human_conf}] + existing[:2]
-                base_result["is_uncertain"] = base_result["confidence"] < 0.60
-                base_result["is_low_confidence"] = base_result["is_uncertain"]
+        if is_human and subtype:
+            base_result["predicted"] = "human"
+            base_result["confidence"] = max(base_result["confidence"], human_conf)
+            existing = [item for item in base_result.get("top_k", []) if item["label"] != "human"]
+            base_result["top_k"] = [{"label": "human", "score": base_result["confidence"]}] + existing[:2]
+            base_result["is_uncertain"] = base_result["confidence"] < 0.50
+            base_result["is_low_confidence"] = base_result["is_uncertain"]
 
         return base_result
